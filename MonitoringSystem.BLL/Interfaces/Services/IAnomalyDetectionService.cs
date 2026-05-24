@@ -10,10 +10,9 @@ public interface IAnomalyDetectionService
 
     List<AnomalyAlgorithmComparisonResult> CompareAlgorithms(
         string serviceName,
-        string? instanceId,
         string metricName,
         List<(DateTime Timestamp, double Value)> timeSeries);
 
-    List<AnomalyResult> AnalyzeBatchWithMlNet(string serviceName, string? instanceId, string metricName,
+    List<AnomalyResult> AnalyzeBatchWithMlNet(string serviceName, string metricName,
         List<(DateTime Timestamp, double Value)> timeSeries);
 }

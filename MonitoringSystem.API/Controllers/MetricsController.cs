@@ -34,12 +34,11 @@ public class MetricsController(IMetricsService metricsService) : ControllerBase
 
     /// <summary>
     /// Отримати метрики за часовим діапазоном
-    /// GET /api/metrics?service=MyService&instance=instance-1&metric=cpu&from=...&to=...
+    /// GET /api/metrics?service=MyService&metric=cpu&from=...&to=...
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetMetrics(
         [FromQuery] string service,
-        [FromQuery] string? instance,
         [FromQuery] string metric,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to)
@@ -49,7 +48,7 @@ public class MetricsController(IMetricsService metricsService) : ControllerBase
             var fromDate = from ?? DateTime.UtcNow.AddHours(-1);
             var toDate = to ?? DateTime.UtcNow;
 
-            var metrics = await metricsService.GetMetricsAsync(service, instance, metric, fromDate, toDate);
+            var metrics = await metricsService.GetMetricsAsync(service, metric, fromDate, toDate);
             return Ok(metrics);
         }
         catch (Exception ex)

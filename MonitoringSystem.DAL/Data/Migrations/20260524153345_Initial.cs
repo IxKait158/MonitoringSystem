@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -15,9 +16,9 @@ namespace MonitoringSystem.DAL.Data.Migrations
                 name: "Anomalies",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     ServiceName = table.Column<string>(type: "text", nullable: false),
-                    InstanceId = table.Column<string>(type: "text", nullable: false),
                     MetricName = table.Column<string>(type: "text", nullable: false),
                     Value = table.Column<double>(type: "double precision", nullable: false),
                     ExpectedValue = table.Column<double>(type: "double precision", nullable: false),
@@ -31,12 +32,30 @@ namespace MonitoringSystem.DAL.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ApiKeys",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Key = table.Column<string>(type: "text", nullable: false),
+                    ServiceName = table.Column<string>(type: "text", nullable: false),
+                    Owner = table.Column<string>(type: "text", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    LastUsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ApiKeys", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "MetricPoints",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     ServiceName = table.Column<string>(type: "text", nullable: false),
-                    InstanceId = table.Column<string>(type: "text", nullable: false),
                     MetricName = table.Column<string>(type: "text", nullable: false),
                     Value = table.Column<double>(type: "double precision", nullable: false),
                     Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -48,14 +67,20 @@ namespace MonitoringSystem.DAL.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Anomalies_ServiceName_InstanceId_DetectedAt",
+                name: "IX_Anomalies_ServiceName_DetectedAt",
                 table: "Anomalies",
-                columns: new[] { "ServiceName", "InstanceId", "DetectedAt" });
+                columns: new[] { "ServiceName", "DetectedAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_MetricPoints_ServiceName_InstanceId_MetricName_Timestamp",
+                name: "IX_ApiKeys_Key",
+                table: "ApiKeys",
+                column: "Key",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MetricPoints_ServiceName_MetricName_Timestamp",
                 table: "MetricPoints",
-                columns: new[] { "ServiceName", "InstanceId", "MetricName", "Timestamp" });
+                columns: new[] { "ServiceName", "MetricName", "Timestamp" });
         }
 
         /// <inheritdoc />
@@ -63,6 +88,9 @@ namespace MonitoringSystem.DAL.Data.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Anomalies");
+
+            migrationBuilder.DropTable(
+                name: "ApiKeys");
 
             migrationBuilder.DropTable(
                 name: "MetricPoints");

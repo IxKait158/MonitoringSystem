@@ -1,9 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.ML;
 using MonitoringSystem.BLL;
 using MonitoringSystem.BLL.Hubs;
 using MonitoringSystem.DAL;
-using MonitoringSystem.DAL.Data;
 using MonitoringSystem.Middlewares;
 using Serilog;
 
@@ -37,7 +35,7 @@ services.AddCors(options =>
 
 var app = builder.Build();
 
-app.ApplyMigrations();
+await app.ApplyMigrations();
 
 if (app.Environment.IsDevelopment())
 {
@@ -49,6 +47,7 @@ app.UseStaticFiles();
 app.UseCors();
 app.UseSerilogRequestLogging();
 
+app.UseApiKeyAuth();
 app.UseMetricsCollection("MonitoringAPI");
 
 app.MapControllers();

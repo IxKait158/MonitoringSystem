@@ -2,9 +2,11 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MonitoringSystem.BLL.Interfaces.Repositories;
 using MonitoringSystem.DAL.Data;
 using MonitoringSystem.DAL.Repositories;
+using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.DAL;
 
@@ -21,12 +23,43 @@ public static class DependencyInjection
         return services;
     }
 
-    public static void ApplyMigrations(this IApplicationBuilder app)
+    public static async Task ApplyMigrations(this IApplicationBuilder app)
     {
         using var scope = app.ApplicationServices.CreateScope();
-        
-        using var context = scope.ServiceProvider.GetRequiredService<MonitoringDbContext>();
-        
-        context.Database.Migrate();
+
+        try
+        {
+            await using var context = scope.ServiceProvider.GetRequiredService<MonitoringDbContext>();
+            await context.Database.MigrateAsync();
+
+            await AddTestsApiKeys(context);
+        }
+        catch (Exception ex)
+        {
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<MonitoringDbContext>>();
+            logger.LogError(ex, $"Помилка при ініціалізації або міграції бази даних: {ex.Message}");
+        }
+    }
+
+    private static async Task AddTestsApiKeys(MonitoringDbContext context)
+    {
+        if (context.ApiKeys.Any())
+            return;
+
+        context.ApiKeys.AddRange(
+            new ApiKeyEntity
+            {
+                Key = "mk_dev_order_service_key_001", ServiceName = "OrderService", Owner = "dev-team", IsActive = true
+            },
+            new ApiKeyEntity
+            {
+                Key = "mk_dev_payment_service_key_002", ServiceName = "PaymentService", Owner = "dev-team", IsActive = true
+            },
+            new ApiKeyEntity
+            {
+                Key = "mk_dev_user_service_key_003", ServiceName = "UserService", Owner = "dev-team", IsActive = true
+            }
+        );
+        await context.SaveChangesAsync();
     }
 }

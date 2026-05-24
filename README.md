@@ -58,18 +58,11 @@ Dashboard
 
 Центральний сервіс обробки метрик:
 
-- нормалізує `ServiceName` та `InstanceId`;
 - зберігає метрики в PostgreSQL;
 - запускає аналіз аномалій;
 - зберігає знайдені аномалії;
 - оновлює in-memory статус сервісів;
 - надсилає події на dashboard через SignalR.
-
-Статуси сервісів ведуться не тільки за назвою сервісу, а за парою:
-
-```text
-ServiceName + InstanceId
-```
 
 Це важливо для розподіленої системи, бо один мікросервіс може мати кілька інстансів.
 
@@ -96,12 +89,6 @@ Middleware не викликає `MetricsService.IngestAsync` напряму, б
 - `system.memory_mb`
 - `http.requests_total`
 - `http.errors_total`
-
-Для API-інстанса використовується `InstanceId` з environment variable:
-
-```text
-MONITORING_INSTANCE_ID
-```
 
 Якщо змінна не задана, використовується `Environment.MachineName`.
 
@@ -142,12 +129,6 @@ MONITORING_INSTANCE_ID
 - онлайн-аналіз через Z-score;
 - пакетний аналіз історичного часового ряду через ML.NET SrCnn.
 
-Для онлайн-аналізу історія ведеться окремо для комбінації:
-
-```text
-ServiceName + InstanceId + MetricName
-```
-
 Це дозволяє не змішувати метрики різних інстансів одного сервісу.
 
 ### `MetricsHub`
@@ -177,7 +158,6 @@ Endpoint:
 ```json
 {
   "serviceName": "PaymentService",
-  "instanceId": "PaymentService-instance-1",
   "metrics": []
 }
 ```
@@ -189,7 +169,6 @@ Endpoint:
 ```json
 {
   "serviceName": "PaymentService",
-  "instanceId": "PaymentService-instance-1",
   "metricName": "http.response_time_ms",
   "value": 123.4,
   "timestamp": "2026-05-24T12:00:00Z",
@@ -207,7 +186,6 @@ Endpoint:
 ```json
 {
   "serviceName": "PaymentService",
-  "instanceId": "PaymentService-instance-1",
   "isHealthy": true,
   "lastSeen": "2026-05-24T12:00:00Z",
   "anomalyCount": 2,
@@ -225,7 +203,6 @@ Endpoint:
 ```json
 {
   "serviceName": "PaymentService",
-  "instanceId": "PaymentService-instance-1",
   "metricName": "http.response_time_ms",
   "value": 2500.0,
   "expectedValue": 70.0,
@@ -257,7 +234,6 @@ Connection string знаходиться в `MonitoringSystem.API/appsettings.js
 Індекси оптимізовані під пошук за:
 
 - `ServiceName`
-- `InstanceId`
 - `MetricName`
 - `Timestamp`
 - `DetectedAt`
@@ -265,7 +241,7 @@ Connection string знаходиться в `MonitoringSystem.API/appsettings.js
 Після зміни моделей потрібно створити та застосувати EF Core migration:
 
 ```powershell
-dotnet ef migrations add AddInstanceIdAndServiceHealth -p MonitoringSystem.API
+dotnet ef migrations add AddServiceHealth -p MonitoringSystem.API
 dotnet ef database update -p MonitoringSystem.API
 ```
 
@@ -313,7 +289,6 @@ const API_URL = 'http://localhost:5000';
 
 ```text
 MONITORING_API_URL
-SIMULATOR_INSTANCE_ID
 ```
 
 Якщо `MONITORING_API_URL` не заданий, використовується:
@@ -326,7 +301,6 @@ http://localhost:5000
 
 ```powershell
 $env:MONITORING_API_URL="http://localhost:5169"
-$env:SIMULATOR_INSTANCE_ID="local-1"
 dotnet run --project ServiceSimulator
 ```
 
@@ -355,7 +329,7 @@ dotnet ef database update -p MonitoringSystem.API
 Якщо міграцій ще немає після останніх змін:
 
 ```powershell
-dotnet ef migrations add AddInstanceIdAndServiceHealth -p MonitoringSystem.API
+dotnet ef migrations add AddServiceHealth -p MonitoringSystem.API
 dotnet ef database update -p MonitoringSystem.API
 ```
 
@@ -378,7 +352,6 @@ https://localhost:7246
 
 ```powershell
 $env:ASPNETCORE_URLS="http://localhost:5000"
-$env:MONITORING_INSTANCE_ID="MonitoringAPI-local"
 dotnet run --project MonitoringSystem.API
 ```
 
@@ -441,7 +414,6 @@ POST /api/metrics/ingest
 ```json
 {
   "serviceName": "PaymentService",
-  "instanceId": "payment-1",
   "metrics": [
     {
       "metricName": "http.response_time_ms",
@@ -458,10 +430,8 @@ POST /api/metrics/ingest
 ### Отримати історію метрик
 
 ```http
-GET /api/metrics?service=PaymentService&instance=payment-1&metric=http.response_time_ms&from=2026-05-24T11:00:00Z&to=2026-05-24T12:00:00Z
+GET /api/metrics?service=PaymentService&metric=http.response_time_ms&from=2026-05-24T11:00:00Z&to=2026-05-24T12:00:00Z
 ```
-
-Параметр `instance` необов'язковий. Якщо його не передати, API поверне метрики всіх інстансів вибраного сервісу.
 
 ### Отримати статуси сервісів
 
@@ -489,7 +459,6 @@ GET /api/anomalies?count=20
 У системі вже реалізовано:
 
 - збір метрик від кількох сервісів;
-- підтримка кількох інстансів одного сервісу через `InstanceId`;
 - збереження історії метрик;
 - real-time dashboard;
 - health-check інстансів сервісів;
@@ -521,7 +490,6 @@ Example request:
 ```json
 {
   "serviceName": "PaymentService",
-  "instanceId": "PaymentService-local-1",
   "metricName": "http.response_time_ms",
   "from": "2026-05-24T11:00:00Z",
   "to": "2026-05-24T12:00:00Z"

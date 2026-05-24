@@ -9,7 +9,7 @@ public interface IMetricsService
 {
     Task IngestAsync(MetricIngestionRequest request);
 
-    Task<List<MetricPoint>> GetMetricsAsync(string serviceName, string? instanceId, string metricName, DateTime from,
+    Task<List<MetricPoint>> GetMetricsAsync(string serviceName, string metricName, DateTime from,
         DateTime to);
 
     List<AnomalyResult> GetRecentAnomaliesAsync(int count);

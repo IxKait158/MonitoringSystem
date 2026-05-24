@@ -18,7 +18,6 @@ public class MetricsService(
 {
     private static readonly ConcurrentDictionary<string, ServiceStatus> ServiceStatuses = new();
     private static readonly object ServiceStatusLock = new();
-    private const string DefaultInstanceId = "default";
 
     public async Task IngestAsync(MetricIngestionRequest request)
     {
@@ -27,20 +26,15 @@ public class MetricsService(
         
         var anomalies = new List<AnomalyResult>();
         var serviceName = request.ServiceName.Trim();
-        var instanceId = NormalizeInstanceId(request.InstanceId);
 
         foreach (var metric in request.Metrics)
         {
             metric.ServiceName = serviceName;
-            metric.InstanceId = string.IsNullOrWhiteSpace(metric.InstanceId)
-                ? instanceId
-                : NormalizeInstanceId(metric.InstanceId);
 
             await metricPointRepository.AddAsync(new MetricPointEntity
             {
                 Id = metric.Id,
                 ServiceName = metric.ServiceName,
-                InstanceId = metric.InstanceId,
                 MetricName = metric.MetricName,
                 Value = metric.Value,
                 Timestamp = metric.Timestamp,
@@ -55,7 +49,6 @@ public class MetricsService(
                 await anomalyRepository.AddAsync(new AnomalyEntity
                 {
                     ServiceName = anomaly.ServiceName,
-                    InstanceId = anomaly.InstanceId,
                     MetricName = anomaly.MetricName,
                     Value = anomaly.Value,
                     ExpectedValue = anomaly.ExpectedValue,
@@ -78,7 +71,6 @@ public class MetricsService(
 
     public async Task<List<MetricPoint>> GetMetricsAsync(
         string serviceName,
-        string? instanceId,
         string metricName,
         DateTime from,
         DateTime to)
@@ -89,12 +81,6 @@ public class MetricsService(
             m.Timestamp >= from &&
             m.Timestamp <= to);
 
-        if (!string.IsNullOrWhiteSpace(instanceId))
-        {
-            var normalizedInstanceId = NormalizeInstanceId(instanceId);
-            query = query.Where(m => m.InstanceId == normalizedInstanceId).ToList();
-        }
-
         var entities = query
             .OrderBy(m => m.Timestamp);
 
@@ -102,7 +88,6 @@ public class MetricsService(
         {
             Id = e.Id,
             ServiceName = e.ServiceName,
-            InstanceId = e.InstanceId,
             MetricName = e.MetricName,
             Value = e.Value,
             Timestamp = e.Timestamp,
@@ -117,7 +102,6 @@ public class MetricsService(
         return entities.Select(e => new AnomalyResult
         {
             ServiceName = e.ServiceName,
-            InstanceId = e.InstanceId,
             MetricName = e.MetricName,
             Value = e.Value,
             ExpectedValue = e.ExpectedValue,
@@ -144,7 +128,6 @@ public class MetricsService(
 
         var metrics = await GetMetricsAsync(
             request.ServiceName,
-            request.InstanceId,
             request.MetricName,
             from,
             to);
@@ -157,14 +140,12 @@ public class MetricsService(
         return new AnomalyAlgorithmComparisonResponse
         {
             ServiceName = request.ServiceName,
-            InstanceId = request.InstanceId,
             MetricName = request.MetricName,
             From = from,
             To = to,
             TotalPoints = timeSeries.Count,
             Algorithms = anomalyDetectionService.CompareAlgorithms(
                 request.ServiceName,
-                request.InstanceId,
                 request.MetricName,
                 timeSeries)
         };
@@ -176,7 +157,6 @@ public class MetricsService(
         {
             return ServiceStatuses.Values
                 .OrderBy(s => s.ServiceName)
-                .ThenBy(s => s.InstanceId)
                 .Select(CloneStatus)
                 .ToList();
         }
@@ -206,21 +186,17 @@ public class MetricsService(
 
     private static void UpdateServiceStatus(MetricPoint metric, bool hasAnomaly)
     {
-        var key = CreateStatusKey(metric.ServiceName, metric.InstanceId);
-
         lock (ServiceStatusLock)
         {
             var status = ServiceStatuses.GetOrAdd(
-                key,
+                metric.ServiceName,
                 _ => new ServiceStatus
                 {
                     ServiceName = metric.ServiceName,
-                    InstanceId = metric.InstanceId,
                     IsHealthy = true
                 });
 
             status.ServiceName = metric.ServiceName;
-            status.InstanceId = metric.InstanceId;
             status.LastSeen = ToUtc(metric.Timestamp);
             status.IsHealthy = true;
             status.LatestMetrics[metric.MetricName] = metric.Value;
@@ -229,12 +205,6 @@ public class MetricsService(
                 status.AnomalyCount++;
         }
     }
-
-    private static string CreateStatusKey(string serviceName, string instanceId) =>
-        $"{serviceName}:{NormalizeInstanceId(instanceId)}";
-
-    private static string NormalizeInstanceId(string? instanceId) =>
-        string.IsNullOrWhiteSpace(instanceId) ? DefaultInstanceId : instanceId.Trim();
 
     private static DateTime ToUtc(DateTime value) =>
         value.Kind switch
@@ -248,7 +218,6 @@ public class MetricsService(
         new()
         {
             ServiceName = status.ServiceName,
-            InstanceId = status.InstanceId,
             IsHealthy = status.IsHealthy,
             LastSeen = status.LastSeen,
             AnomalyCount = status.AnomalyCount,

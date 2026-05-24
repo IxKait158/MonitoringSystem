@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 using MonitoringSystem.BLL.Interfaces.Services;
-using MonitoringSystem.BLL.Models;
 using MonitoringSystem.BLL.Models.Anomalies;
 using MonitoringSystem.BLL.Models.Metrics;
 
@@ -29,7 +28,7 @@ public class AnomalyDetectionService(
 
     public AnomalyResult Analyze(MetricPoint point)
     {
-        var key = $"{point.ServiceName}:{point.InstanceId}:{point.MetricName}";
+        var key = $"{point.ServiceName}:{point.MetricName}";
         var history = _metricHistory.GetOrAdd(key, _ => new Queue<double>());
         var historyLock = _historyLocks.GetOrAdd(key, _ => new object());
 
@@ -39,7 +38,6 @@ public class AnomalyDetectionService(
             {
                 MetricPointId = point.Id,
                 ServiceName = point.ServiceName,
-                InstanceId = point.InstanceId,
                 MetricName = point.MetricName,
                 Value = point.Value,
                 DetectedAt = DateTime.UtcNow
@@ -62,9 +60,8 @@ public class AnomalyDetectionService(
                     if (result.IsAnomaly)
                     {
                         logger.LogInformation(
-                            "Anomaly detected for {ServiceName}:{InstanceId}:{MetricName}, value={Value}, Z-Score={ZScore:F2}",
+                            "Anomaly detected for {ServiceName}:{MetricName}, value={Value}, Z-Score={ZScore:F2}",
                             point.ServiceName,
-                            point.InstanceId,
                             point.MetricName,
                             result.Value,
                             zScore);
@@ -81,9 +78,7 @@ public class AnomalyDetectionService(
     }
 
     public List<AnomalyAlgorithmComparisonResult> CompareAlgorithms(
-        string serviceName,
-        string? instanceId,
-        string metricName,
+        string serviceName, string metricName,
         List<(DateTime Timestamp, double Value)> timeSeries)
     {
         var orderedSeries = timeSeries
@@ -94,16 +89,16 @@ public class AnomalyDetectionService(
         {
             BuildComparisonResult(
                 "Z-score",
-                AnalyzeBatchWithZScore(serviceName, instanceId, metricName, orderedSeries)),
+                AnalyzeBatchWithZScore(serviceName, metricName, orderedSeries)),
             BuildComparisonResult(
                 "Moving average",
-                AnalyzeBatchWithMovingAverage(serviceName, instanceId, metricName, orderedSeries)),
+                AnalyzeBatchWithMovingAverage(serviceName, metricName, orderedSeries)),
             BuildComparisonResult(
                 "EWMA",
-                AnalyzeBatchWithEwma(serviceName, instanceId, metricName, orderedSeries))
+                AnalyzeBatchWithEwma(serviceName, metricName, orderedSeries))
         };
 
-        var srCnnResults = AnalyzeBatchWithMlNet(serviceName, instanceId, metricName, orderedSeries);
+        var srCnnResults = AnalyzeBatchWithMlNet(serviceName, metricName, orderedSeries);
         if (srCnnResults.Count != 0)
             results.Add(BuildComparisonResult("ML.NET SrCnn", srCnnResults));
 
@@ -111,9 +106,7 @@ public class AnomalyDetectionService(
     }
 
     private List<AnomalyResult> AnalyzeBatchWithZScore(
-        string serviceName,
-        string? instanceId,
-        string metricName,
+        string serviceName, string metricName,
         List<(DateTime Timestamp, double Value)> timeSeries)
     {
         var results = new List<AnomalyResult>();
@@ -140,7 +133,6 @@ public class AnomalyDetectionService(
 
             results.Add(CreateBatchResult(
                 serviceName,
-                instanceId,
                 metricName,
                 point,
                 mean,
@@ -152,9 +144,7 @@ public class AnomalyDetectionService(
     }
 
     private List<AnomalyResult> AnalyzeBatchWithMovingAverage(
-        string serviceName,
-        string? instanceId,
-        string metricName,
+        string serviceName, string metricName,
         List<(DateTime Timestamp, double Value)> timeSeries)
     {
         var results = new List<AnomalyResult>();
@@ -178,7 +168,6 @@ public class AnomalyDetectionService(
 
             results.Add(CreateBatchResult(
                 serviceName,
-                instanceId,
                 metricName,
                 point,
                 movingAverage,
@@ -190,9 +179,7 @@ public class AnomalyDetectionService(
     }
 
     private List<AnomalyResult> AnalyzeBatchWithEwma(
-        string serviceName,
-        string? instanceId,
-        string metricName,
+        string serviceName, string metricName,
         List<(DateTime Timestamp, double Value)> timeSeries)
     {
         var results = new List<AnomalyResult>();
@@ -219,7 +206,6 @@ public class AnomalyDetectionService(
 
                     results.Add(CreateBatchResult(
                         serviceName,
-                        instanceId,
                         metricName,
                         point,
                         expected,
@@ -243,9 +229,7 @@ public class AnomalyDetectionService(
     /// Використовується для пакетного аналізу історичних даних.
     /// </summary>
     public List<AnomalyResult> AnalyzeBatchWithMlNet(
-        string serviceName,
-        string? instanceId,
-        string metricName,
+        string serviceName, string metricName,
         List<(DateTime Timestamp, double Value)> timeSeries)
     {
         if (timeSeries.Count < 12) 
@@ -273,7 +257,6 @@ public class AnomalyDetectionService(
         return timeSeries.Select((point, i) => new AnomalyResult
         {
             ServiceName = serviceName,
-            InstanceId = instanceId ?? string.Empty,
             MetricName = metricName,
             Value = point.Value,
             AnomalyScore = resultColumn[i][1],
@@ -302,9 +285,7 @@ public class AnomalyDetectionService(
     }
 
     private static AnomalyResult CreateBatchResult(
-        string serviceName,
-        string? instanceId,
-        string metricName,
+        string serviceName, string metricName,
         (DateTime Timestamp, double Value) point,
         double expectedValue,
         double anomalyScore,
@@ -312,7 +293,6 @@ public class AnomalyDetectionService(
         new()
         {
             ServiceName = serviceName,
-            InstanceId = instanceId ?? string.Empty,
             MetricName = metricName,
             Value = point.Value,
             ExpectedValue = expectedValue,

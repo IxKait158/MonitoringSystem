@@ -57,7 +57,6 @@ connection.on('ServiceStatusUpdated', (statuses) => {
     grid.innerHTML = '';
 
     statuses.forEach(s => {
-        const instanceId = s.instanceId ?? 'default';
         const rt = s.latestMetrics['http.response_time_ms'] ?? 0;
         const mem = s.latestMetrics['system.memory_mb'] ?? 0;
         const cpu = s.latestMetrics['system.cpu_percent'] ?? 0;
@@ -68,7 +67,6 @@ connection.on('ServiceStatusUpdated', (statuses) => {
         grid.innerHTML += `
       <div class="service-card ${s.anomalyCount > 0 ? 'anomaly' : ''} ${s.isHealthy ? '' : 'unhealthy'}">
         <div class="service-name">${s.serviceName}</div>
-        <div class="instance-id">${instanceId}</div>
         <div class="metric-row"><span class="metric-label">Response Time</span><span class="metric-value ${rtClass}">${rt.toFixed(0)}ms</span></div>
         <div class="metric-row"><span class="metric-label">Memory</span><span class="metric-value ok">${mem.toFixed(0)}MB</span></div>
         <div class="metric-row"><span class="metric-label">CPU</span><span class="metric-value ${cpuClass}">${cpu.toFixed(1)}%</span></div>
@@ -83,13 +81,11 @@ connection.on('AnomaliesDetected', (anomalies) => {
     if (list.children[0]?.style?.color) list.innerHTML = '';
 
     anomalies.forEach(a => {
-        const instanceId = a.instanceId ?? 'default';
         const item = document.createElement('div');
         item.className = 'anomaly-item';
         item.innerHTML = `
       <span class="anomaly-severity severity-${a.severity}">${a.severity}</span>
       <span class="anomaly-service">${a.serviceName}</span>
-      <span class="anomaly-service">${instanceId}</span>
       <span class="anomaly-details">${a.metricName}: ${a.value.toFixed(2)} (очікувалось ~${a.expectedValue.toFixed(2)})</span>
       <span class="anomaly-time">${new Date().toLocaleTimeString('uk')}</span>`;
         list.prepend(item);

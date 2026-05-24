@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MonitoringSystem.DAL.Data.Migrations
 {
     [DbContext(typeof(MonitoringDbContext))]
-    [Migration("20260524111710_Initial")]
+    [Migration("20260524153345_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -27,9 +27,11 @@ namespace MonitoringSystem.DAL.Data.Migrations
 
             modelBuilder.Entity("MonitoringSystem.Domain.Entities.AnomalyEntity", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<double>("AnomalyScore")
                         .HasColumnType("double precision");
@@ -39,10 +41,6 @@ namespace MonitoringSystem.DAL.Data.Migrations
 
                     b.Property<double>("ExpectedValue")
                         .HasColumnType("double precision");
-
-                    b.Property<string>("InstanceId")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<bool>("IsAnomaly")
                         .HasColumnType("boolean");
@@ -60,20 +58,55 @@ namespace MonitoringSystem.DAL.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ServiceName", "InstanceId", "DetectedAt");
+                    b.HasIndex("ServiceName", "DetectedAt");
 
                     b.ToTable("Anomalies");
                 });
 
-            modelBuilder.Entity("MonitoringSystem.Domain.Entities.MetricPointEntity", b =>
+            modelBuilder.Entity("MonitoringSystem.Domain.Entities.ApiKeyEntity", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("InstanceId")
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Key")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTime>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Owner")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("ApiKeys");
+                });
+
+            modelBuilder.Entity("MonitoringSystem.Domain.Entities.MetricPointEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("MetricName")
                         .IsRequired()
@@ -95,7 +128,7 @@ namespace MonitoringSystem.DAL.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ServiceName", "InstanceId", "MetricName", "Timestamp");
+                    b.HasIndex("ServiceName", "MetricName", "Timestamp");
 
                     b.ToTable("MetricPoints");
                 });

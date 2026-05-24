@@ -10,13 +10,13 @@ public class MonitoringDbContext(DbContextOptions<MonitoringDbContext> options) 
     public DbSet<MetricPointEntity> MetricPoints => Set<MetricPointEntity>();
     public DbSet<AnomalyEntity> Anomalies => Set<AnomalyEntity>();
     public DbSet<ApiKeyEntity> ApiKeys => Set<ApiKeyEntity>();
-
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<MetricPointEntity>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => new { x.ServiceName, x.InstanceId, x.MetricName, x.Timestamp });
+            e.HasIndex(x => new { x.ServiceName, x.MetricName, x.Timestamp });
             
             var tagsComparer = new ValueComparer<Dictionary<string, string>>(
                 (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
@@ -35,7 +35,7 @@ public class MonitoringDbContext(DbContextOptions<MonitoringDbContext> options) 
         modelBuilder.Entity<AnomalyEntity>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => new { x.ServiceName, x.InstanceId, x.DetectedAt });
+            e.HasIndex(x => new { x.ServiceName, x.DetectedAt });
         });
 
         modelBuilder.Entity<ApiKeyEntity>(e =>

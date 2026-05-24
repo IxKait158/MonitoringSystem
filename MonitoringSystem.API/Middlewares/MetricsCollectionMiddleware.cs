@@ -9,11 +9,8 @@ public class MetricsCollectionMiddleware(
     RequestDelegate next,
     string serviceName)
 {
-    private static long requestCount = 0;
-    private static long errorCount = 0;
-    private readonly string instanceId =
-        Environment.GetEnvironmentVariable("MONITORING_INSTANCE_ID") ??
-        Environment.MachineName;
+    private static long _requestCount = 0;
+    private static long _errorCount = 0;
 
     public async Task InvokeAsync(HttpContext context, IMetricIngestionQueue ingestionQueue)
     {
@@ -25,18 +22,18 @@ public class MetricsCollectionMiddleware(
         }
         
         var sw = Stopwatch.StartNew();
-        Interlocked.Increment(ref requestCount);
+        Interlocked.Increment(ref _requestCount);
 
         try
         {
             await next(context);
 
             if (context.Response.StatusCode >= 500)
-                Interlocked.Increment(ref errorCount);
+                Interlocked.Increment(ref _errorCount);
         }
         catch
         {
-            Interlocked.Increment(ref errorCount);
+            Interlocked.Increment(ref _errorCount);
             throw;
         }
         finally
@@ -48,7 +45,6 @@ public class MetricsCollectionMiddleware(
                 new()
                 {
                     ServiceName = serviceName,
-                    InstanceId = instanceId,
                     MetricName = "http.response_time_ms",
                     Value = sw.ElapsedMilliseconds,
                     Timestamp = DateTime.UtcNow,
@@ -57,7 +53,6 @@ public class MetricsCollectionMiddleware(
                 new()
                 {
                     ServiceName = serviceName,
-                    InstanceId = instanceId,
                     MetricName = "system.memory_mb",
                     Value = GC.GetTotalMemory(false) / 1024.0 / 1024.0,
                     Timestamp = DateTime.UtcNow
@@ -65,17 +60,15 @@ public class MetricsCollectionMiddleware(
                 new()
                 {
                     ServiceName = serviceName,
-                    InstanceId = instanceId,
                     MetricName = "http.requests_total",
-                    Value = Interlocked.Read(ref requestCount),
+                    Value = Interlocked.Read(ref _requestCount),
                     Timestamp = DateTime.UtcNow
                 },
                 new()
                 {
                     ServiceName = serviceName,
-                    InstanceId = instanceId,
                     MetricName = "http.errors_total",
-                    Value = Interlocked.Read(ref errorCount),
+                    Value = Interlocked.Read(ref _errorCount),
                     Timestamp = DateTime.UtcNow
                 }
             };
@@ -83,7 +76,6 @@ public class MetricsCollectionMiddleware(
             await ingestionQueue.QueueAsync(new MetricIngestionRequest
             {
                 ServiceName = serviceName,
-                InstanceId = instanceId,
                 Metrics = metrics
             });
         }

@@ -6,7 +6,6 @@ public class AnomalyEntity : IEntity
 {
     public int Id { get; set; }
     public string ServiceName { get; set; } = string.Empty;
-    public string InstanceId { get; set; } = string.Empty;
     public string MetricName { get; set; } = string.Empty;
     public double Value { get; set; }
     public double ExpectedValue { get; set; }
