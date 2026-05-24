@@ -1,8 +1,8 @@
-﻿namespace MonitoringSystem.BLL.Models;
+﻿namespace MonitoringSystem.BLL.Models.Anomalies;
 
 public class AnomalyResult
 {
-    public Guid MetricPointId { get; set; }
+    public int MetricPointId { get; set; }
     public string ServiceName { get; set; } = string.Empty;
     public string InstanceId { get; set; } = string.Empty;
     public string MetricName { get; set; } = string.Empty;

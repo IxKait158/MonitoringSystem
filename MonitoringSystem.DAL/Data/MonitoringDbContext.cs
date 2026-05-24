@@ -9,6 +9,7 @@ public class MonitoringDbContext(DbContextOptions<MonitoringDbContext> options) 
 {
     public DbSet<MetricPointEntity> MetricPoints => Set<MetricPointEntity>();
     public DbSet<AnomalyEntity> Anomalies => Set<AnomalyEntity>();
+    public DbSet<ApiKeyEntity> ApiKeys => Set<ApiKeyEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +36,12 @@ public class MonitoringDbContext(DbContextOptions<MonitoringDbContext> options) 
         {
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.ServiceName, x.InstanceId, x.DetectedAt });
+        });
+
+        modelBuilder.Entity<ApiKeyEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Key).IsUnique();
         });
         
         base.OnModelCreating(modelBuilder);

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models;
+using MonitoringSystem.BLL.Models.Metrics;
 
 namespace MonitoringSystem.BLL.Services;
 

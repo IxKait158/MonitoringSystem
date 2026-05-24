@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using MonitoringSystem.BLL.Interfaces.Services;
-using MonitoringSystem.BLL.Models;
+using MonitoringSystem.BLL.Models.Metrics;
 
 namespace MonitoringSystem.Controllers;
 
@@ -15,11 +15,21 @@ public class MetricsController(IMetricsService metricsService) : ControllerBase
     [HttpPost("ingest")]
     public async Task<IActionResult> Ingest([FromBody] MetricIngestionRequest request)
     {
-        if (string.IsNullOrEmpty(request.ServiceName))
-            return BadRequest("ServiceName is required");
-        
-        await metricsService.IngestAsync(request);
-        return Ok(new { received = request.Metrics.Count });
+        try
+        {
+            await metricsService.IngestAsync(request);
+            return Ok(new
+            {
+                received = request.Metrics.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
     }
 
     /// <summary>
@@ -34,11 +44,21 @@ public class MetricsController(IMetricsService metricsService) : ControllerBase
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to)
     {
-        var fromDate = from ?? DateTime.UtcNow.AddHours(-1);
-        var toDate = to ?? DateTime.UtcNow;
-        
-        var metrics = await metricsService.GetMetricsAsync(service, instance, metric, fromDate, toDate);
-        return Ok(metrics);
+        try
+        {
+            var fromDate = from ?? DateTime.UtcNow.AddHours(-1);
+            var toDate = to ?? DateTime.UtcNow;
+
+            var metrics = await metricsService.GetMetricsAsync(service, instance, metric, fromDate, toDate);
+            return Ok(metrics);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
     }
 
     /// <summary>
@@ -48,7 +68,17 @@ public class MetricsController(IMetricsService metricsService) : ControllerBase
     [HttpGet("services")]
     public IActionResult GetServices()
     {
-        var statuses = metricsService.GetServiceStatuses();
-        return Ok(statuses);
+        try
+        {
+            var statuses = metricsService.GetServiceStatuses();
+            return Ok(statuses);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
     }
 }

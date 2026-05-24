@@ -2,9 +2,10 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.ML;
 using Microsoft.ML.Data;
-using Microsoft.ML.Transforms.TimeSeries;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models;
+using MonitoringSystem.BLL.Models.Anomalies;
+using MonitoringSystem.BLL.Models.Metrics;
 
 namespace MonitoringSystem.BLL.Services;
 

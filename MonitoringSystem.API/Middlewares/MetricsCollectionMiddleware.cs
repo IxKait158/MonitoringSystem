@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models;
+using MonitoringSystem.BLL.Models.Metrics;
 
 namespace MonitoringSystem.Middlewares;
 

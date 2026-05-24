@@ -1,4 +1,4 @@
-﻿namespace MonitoringSystem.BLL.Models;
+﻿namespace MonitoringSystem.BLL.Models.Metrics;
 
 public class MetricIngestionRequest
 {

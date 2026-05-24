@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models;
+using MonitoringSystem.BLL.Models.Services;
 
 namespace MonitoringSystem.BLL.Services;
 

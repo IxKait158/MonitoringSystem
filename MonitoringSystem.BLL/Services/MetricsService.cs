@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.SignalR;
 using MonitoringSystem.BLL.Hubs;
 using MonitoringSystem.BLL.Interfaces.Repositories;
 using MonitoringSystem.BLL.Interfaces.Services;
-using MonitoringSystem.BLL.Models;
+using MonitoringSystem.BLL.Models.Anomalies;
+using MonitoringSystem.BLL.Models.Metrics;
+using MonitoringSystem.BLL.Models.Services;
 using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.BLL.Services;
@@ -20,6 +22,9 @@ public class MetricsService(
 
     public async Task IngestAsync(MetricIngestionRequest request)
     {
+        if (string.IsNullOrEmpty(request.ServiceName))
+            throw new Exception("Ім'я сервісу обов'язкове");
+        
         var anomalies = new List<AnomalyResult>();
         var serviceName = request.ServiceName.Trim();
         var instanceId = NormalizeInstanceId(request.InstanceId);
@@ -78,13 +83,11 @@ public class MetricsService(
         DateTime from,
         DateTime to)
     {
-        var query = metricPointRepository.GetAll()
-            .Where(m =>
-                m.ServiceName == serviceName &&
-                m.MetricName == metricName &&
-                m.Timestamp >= from &&
-                m.Timestamp <= to)
-            .ToList();
+        var query = metricPointRepository.GetAll(m =>
+            m.ServiceName == serviceName &&
+            m.MetricName == metricName &&
+            m.Timestamp >= from &&
+            m.Timestamp <= to);
 
         if (!string.IsNullOrWhiteSpace(instanceId))
         {
@@ -109,10 +112,7 @@ public class MetricsService(
 
     public List<AnomalyResult> GetRecentAnomaliesAsync(int count = 20)
     {
-        var entities = anomalyRepository.GetAllNoTracking()
-            .OrderByDescending(a => a.DetectedAt)
-            .Take(count)
-            .ToList();
+        var entities = anomalyRepository.GetRecentAnomalies(count).ToList();
 
         return entities.Select(e => new AnomalyResult
         {
@@ -130,6 +130,15 @@ public class MetricsService(
     public async Task<AnomalyAlgorithmComparisonResponse> CompareAnomalyAlgorithmsAsync(
         AnomalyAlgorithmComparisonRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.ServiceName))
+            throw new Exception("Ім'я сервісу обов'язкове");
+
+        if (string.IsNullOrWhiteSpace(request.MetricName))
+            throw new Exception("Ім'я метрики обов'язкове");
+
+        if (request.From.HasValue && request.To.HasValue && request.From > request.To)
+            throw new Exception("Дата від має бути раніше, ніж дата до");
+        
         var from = request.From ?? DateTime.UtcNow.AddHours(-1);
         var to = request.To ?? DateTime.UtcNow;
 

@@ -1,4 +1,7 @@
 ﻿using MonitoringSystem.BLL.Models;
+using MonitoringSystem.BLL.Models.Anomalies;
+using MonitoringSystem.BLL.Models.Metrics;
+using MonitoringSystem.BLL.Models.Services;
 
 namespace MonitoringSystem.BLL.Interfaces.Services;
 

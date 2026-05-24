@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models;
+using MonitoringSystem.BLL.Models.Services;
 using MonitoringSystem.BLL.Services;
 
 namespace MonitoringSystem.BLL;

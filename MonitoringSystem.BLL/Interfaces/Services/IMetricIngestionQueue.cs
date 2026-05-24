@@ -1,4 +1,5 @@
 ﻿using MonitoringSystem.BLL.Models;
+using MonitoringSystem.BLL.Models.Metrics;
 
 namespace MonitoringSystem.BLL.Interfaces.Services;
 
