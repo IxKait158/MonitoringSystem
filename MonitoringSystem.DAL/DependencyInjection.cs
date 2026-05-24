@@ -19,6 +19,7 @@ public static class DependencyInjection
 
         services.AddScoped<IMetricPointRepository, MetricPointRepository>();
         services.AddScoped<IAnomalyRepository, AnomalyRepository>();
+        services.AddScoped<IApiKeysRepository, ApiKeysesRepository>();
 
         return services;
     }
@@ -32,7 +33,8 @@ public static class DependencyInjection
             await using var context = scope.ServiceProvider.GetRequiredService<MonitoringDbContext>();
             await context.Database.MigrateAsync();
 
-            await AddTestsApiKeys(context);
+            if (!await context.ApiKeys.AnyAsync())
+                await AddTestsApiKeys(context);
         }
         catch (Exception ex)
         {
@@ -43,9 +45,6 @@ public static class DependencyInjection
 
     private static async Task AddTestsApiKeys(MonitoringDbContext context)
     {
-        if (context.ApiKeys.Any())
-            return;
-
         context.ApiKeys.AddRange(
             new ApiKeyEntity
             {
@@ -58,8 +57,7 @@ public static class DependencyInjection
             new ApiKeyEntity
             {
                 Key = "mk_dev_user_service_key_003", ServiceName = "UserService", Owner = "dev-team", IsActive = true
-            }
-        );
+            });
         await context.SaveChangesAsync();
     }
 }

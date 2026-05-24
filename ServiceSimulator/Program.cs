@@ -50,7 +50,7 @@ while (true)
         {
             var response = await client.Value.PostAsJsonAsync("/api/metrics/ingest", request);
             if (response.IsSuccessStatusCode)
-                Console.WriteLine($"SUCCESS: [{DateTime.Now:HH:mm:ss}] {client.Key}: CPU={cpuBase:F1}%, Mem={memBase:F0}MB, RT={responseTimeBase:F0}ms");
+                Console.WriteLine($"SUCCESS: [{DateTime.UtcNow:HH:mm:ss}] {client.Key}: CPU={cpuBase:F1}%, Mem={memBase:F0}MB, RT={responseTimeBase:F0}ms");
             else
                 Console.WriteLine($"ERROR: Error for {client.Key}: {response.StatusCode}");
         }

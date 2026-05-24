@@ -2,7 +2,7 @@
 
 namespace MonitoringSystem.Middlewares;
 
-public class ApiKeyMiddleware(RequestDelegate next, IApiKeysRepository apiKeysRepository)
+public class ApiKeyMiddleware(RequestDelegate next)
 {
     private const string ApiKeyHeader = "X-API-KEY";
 
@@ -14,7 +14,7 @@ public class ApiKeyMiddleware(RequestDelegate next, IApiKeysRepository apiKeysRe
         "/api/key"
     };
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task InvokeAsync(HttpContext context, IApiKeysRepository apiKeysRepository)
     {
         var path = context.Request.Path.Value ?? "";
 

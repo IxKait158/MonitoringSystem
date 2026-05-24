@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MonitoringSystem.BLL.Interfaces.Services;
-using MonitoringSystem.BLL.Models;
 using MonitoringSystem.BLL.Models.Services;
 using MonitoringSystem.BLL.Services;
 
@@ -16,6 +15,7 @@ public static class DependencyInjection
         services.AddSingleton<IAnomalyDetectionService, AnomalyDetectionService>();
         services.AddSingleton<IMetricIngestionQueue, MetricIngestionQueue>();
         services.AddScoped<IMetricsService, MetricsService>();
+        services.AddScoped<IApiKeysService, ApiKeysService>();
 
         services.AddHostedService<MetricIngestionBackgroundService>();
         services.AddHostedService<ServiceHealthBackgroundService>();
