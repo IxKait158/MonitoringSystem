@@ -1,0 +1,334 @@
+﻿using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+using Microsoft.ML;
+using Microsoft.ML.Data;
+using Microsoft.ML.Transforms.TimeSeries;
+using MonitoringSystem.BLL.Interfaces.Services;
+using MonitoringSystem.BLL.Models;
+
+namespace MonitoringSystem.BLL.Services;
+
+/// <summary>
+/// Виявлення аномалій:
+/// 1. Z-score для online-аналізу.
+/// 2. Z-score, moving average, EWMA та ML.NET SrCnn для batch-порівняння.
+/// </summary>
+public class AnomalyDetectionService(
+    MLContext mlContext,
+    ILogger<AnomalyDetectionService> logger) : IAnomalyDetectionService
+{
+    private readonly ConcurrentDictionary<string, Queue<double>> _metricHistory = new();
+    private readonly ConcurrentDictionary<string, object> _historyLocks = new();
+    private const int WindowSize = 30;
+    private const int MinHistorySize = 5;
+    private const double ZScoreThreshold = 2.5;
+    private const double MovingAverageRelativeThreshold = 0.6;
+    private const double EwmaAlpha = 0.3;
+    private const double EwmaResidualThreshold = 3.0;
+
+    public AnomalyResult Analyze(MetricPoint point)
+    {
+        var key = $"{point.ServiceName}:{point.InstanceId}:{point.MetricName}";
+        var history = _metricHistory.GetOrAdd(key, _ => new Queue<double>());
+        var historyLock = _historyLocks.GetOrAdd(key, _ => new object());
+
+        lock (historyLock)
+        {
+            var result = new AnomalyResult
+            {
+                MetricPointId = point.Id,
+                ServiceName = point.ServiceName,
+                InstanceId = point.InstanceId,
+                MetricName = point.MetricName,
+                Value = point.Value,
+                DetectedAt = DateTime.UtcNow
+            };
+
+            if (history.Count >= MinHistorySize)
+            {
+                var values = history.ToArray();
+                var mean = values.Average();
+                var std = StandardDeviation(values);
+
+                result.ExpectedValue = mean;
+
+                if (std > 0)
+                {
+                    var zScore = Math.Abs((point.Value - mean) / std);
+                    result.AnomalyScore = Math.Min(zScore / ZScoreThreshold, 1.0);
+                    result.IsAnomaly = zScore > ZScoreThreshold;
+
+                    if (result.IsAnomaly)
+                    {
+                        logger.LogInformation(
+                            "Anomaly detected for {ServiceName}:{InstanceId}:{MetricName}, value={Value}, Z-Score={ZScore:F2}",
+                            point.ServiceName,
+                            point.InstanceId,
+                            point.MetricName,
+                            result.Value,
+                            zScore);
+                    }
+                }
+            }
+
+            history.Enqueue(point.Value);
+            if (history.Count > WindowSize)
+                history.Dequeue();
+
+            return result;
+        }
+    }
+
+    public List<AnomalyAlgorithmComparisonResult> CompareAlgorithms(
+        string serviceName,
+        string? instanceId,
+        string metricName,
+        List<(DateTime Timestamp, double Value)> timeSeries)
+    {
+        var orderedSeries = timeSeries
+            .OrderBy(x => x.Timestamp)
+            .ToList();
+
+        var results = new List<AnomalyAlgorithmComparisonResult>
+        {
+            BuildComparisonResult(
+                "Z-score",
+                AnalyzeBatchWithZScore(serviceName, instanceId, metricName, orderedSeries)),
+            BuildComparisonResult(
+                "Moving average",
+                AnalyzeBatchWithMovingAverage(serviceName, instanceId, metricName, orderedSeries)),
+            BuildComparisonResult(
+                "EWMA",
+                AnalyzeBatchWithEwma(serviceName, instanceId, metricName, orderedSeries))
+        };
+
+        var srCnnResults = AnalyzeBatchWithMlNet(serviceName, instanceId, metricName, orderedSeries);
+        if (srCnnResults.Count != 0)
+            results.Add(BuildComparisonResult("ML.NET SrCnn", srCnnResults));
+
+        return results;
+    }
+
+    private List<AnomalyResult> AnalyzeBatchWithZScore(
+        string serviceName,
+        string? instanceId,
+        string metricName,
+        List<(DateTime Timestamp, double Value)> timeSeries)
+    {
+        var results = new List<AnomalyResult>();
+
+        for (var i = 0; i < timeSeries.Count; i++)
+        {
+            var point = timeSeries[i];
+            var history = timeSeries
+                .Skip(Math.Max(0, i - WindowSize))
+                .Take(Math.Min(WindowSize, i))
+                .Select(x => x.Value)
+                .ToArray();
+
+            if (history.Length < MinHistorySize)
+                continue;
+
+            var mean = history.Average();
+            var std = StandardDeviation(history);
+            if (std <= 0)
+                continue;
+
+            var zScore = Math.Abs((point.Value - mean) / std);
+            var anomalyScore = Math.Min(zScore / ZScoreThreshold, 1.0);
+
+            results.Add(CreateBatchResult(
+                serviceName,
+                instanceId,
+                metricName,
+                point,
+                mean,
+                anomalyScore,
+                zScore > ZScoreThreshold));
+        }
+
+        return results;
+    }
+
+    private List<AnomalyResult> AnalyzeBatchWithMovingAverage(
+        string serviceName,
+        string? instanceId,
+        string metricName,
+        List<(DateTime Timestamp, double Value)> timeSeries)
+    {
+        var results = new List<AnomalyResult>();
+
+        for (var i = 0; i < timeSeries.Count; i++)
+        {
+            var point = timeSeries[i];
+            var history = timeSeries
+                .Skip(Math.Max(0, i - WindowSize))
+                .Take(Math.Min(WindowSize, i))
+                .Select(x => x.Value)
+                .ToArray();
+
+            if (history.Length < MinHistorySize)
+                continue;
+
+            var movingAverage = history.Average();
+            var denominator = Math.Max(Math.Abs(movingAverage), 1.0);
+            var relativeDeviation = Math.Abs(point.Value - movingAverage) / denominator;
+            var anomalyScore = Math.Min(relativeDeviation / MovingAverageRelativeThreshold, 1.0);
+
+            results.Add(CreateBatchResult(
+                serviceName,
+                instanceId,
+                metricName,
+                point,
+                movingAverage,
+                anomalyScore,
+                relativeDeviation > MovingAverageRelativeThreshold));
+        }
+
+        return results;
+    }
+
+    private List<AnomalyResult> AnalyzeBatchWithEwma(
+        string serviceName,
+        string? instanceId,
+        string metricName,
+        List<(DateTime Timestamp, double Value)> timeSeries)
+    {
+        var results = new List<AnomalyResult>();
+        if (timeSeries.Count == 0)
+            return results;
+
+        var expected = timeSeries[0].Value;
+        var residualHistory = new Queue<double>();
+
+        foreach (var point in timeSeries)
+        {
+            var residual = Math.Abs(point.Value - expected);
+
+            if (residualHistory.Count >= MinHistorySize)
+            {
+                var residuals = residualHistory.ToArray();
+                var residualMean = residuals.Average();
+                var residualStd = StandardDeviation(residuals);
+
+                if (residualStd > 0)
+                {
+                    var residualScore = Math.Abs((residual - residualMean) / residualStd);
+                    var anomalyScore = Math.Min(residualScore / EwmaResidualThreshold, 1.0);
+
+                    results.Add(CreateBatchResult(
+                        serviceName,
+                        instanceId,
+                        metricName,
+                        point,
+                        expected,
+                        anomalyScore,
+                        residualScore > EwmaResidualThreshold));
+                }
+            }
+
+            residualHistory.Enqueue(residual);
+            if (residualHistory.Count > WindowSize)
+                residualHistory.Dequeue();
+
+            expected = EwmaAlpha * point.Value + (1 - EwmaAlpha) * expected;
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// ML.NET підхід — SrCnn алгоритм для часових рядів.
+    /// Використовується для пакетного аналізу історичних даних.
+    /// </summary>
+    public List<AnomalyResult> AnalyzeBatchWithMlNet(
+        string serviceName,
+        string? instanceId,
+        string metricName,
+        List<(DateTime Timestamp, double Value)> timeSeries)
+    {
+        if (timeSeries.Count < 12) 
+            return new List<AnomalyResult>();
+        
+        var data = timeSeries.Select(x => new TimeSeriesInput { Value = (float)x.Value }).ToList();
+        var dataView = mlContext.Data.LoadFromEnumerable(data);
+        
+        // SrCnn — Spectral Residual + CNN для виявлення аномалій
+        var pipeline = mlContext.Transforms.DetectAnomalyBySrCnn(
+            outputColumnName: "Prediction",
+            inputColumnName: nameof(TimeSeriesInput.Value),
+            windowSize: Math.Min(11, timeSeries.Count / 2),
+            backAddWindowSize: 5,
+            lookaheadWindowSize: 5,
+            averagingWindowSize: 3,
+            judgementWindowSize: Math.Min(21, timeSeries.Count),
+            threshold: 0.3);
+
+        var model = pipeline.Fit(dataView);
+        var predictions = model.Transform(dataView);
+
+        var resultColumn = predictions.GetColumn<double[]>("Prediction").ToList();
+
+        return timeSeries.Select((point, i) => new AnomalyResult
+        {
+            ServiceName = serviceName,
+            InstanceId = instanceId ?? string.Empty,
+            MetricName = metricName,
+            Value = point.Value,
+            AnomalyScore = resultColumn[i][1],
+            IsAnomaly = resultColumn[i][0] > 0,
+            DetectedAt = point.Timestamp
+        }).ToList();
+    }
+
+    private static AnomalyAlgorithmComparisonResult BuildComparisonResult(
+        string algorithm,
+        List<AnomalyResult> results)
+    {
+        var anomalies = results
+            .Where(x => x.IsAnomaly)
+            .OrderByDescending(x => x.AnomalyScore)
+            .ToList();
+
+        return new AnomalyAlgorithmComparisonResult
+        {
+            Algorithm = algorithm,
+            TotalAnomalies = anomalies.Count,
+            AverageScore = results.Count == 0 ? 0 : results.Average(x => x.AnomalyScore),
+            MaxScore = results.Count == 0 ? 0 : results.Max(x => x.AnomalyScore),
+            Anomalies = anomalies
+        };
+    }
+
+    private static AnomalyResult CreateBatchResult(
+        string serviceName,
+        string? instanceId,
+        string metricName,
+        (DateTime Timestamp, double Value) point,
+        double expectedValue,
+        double anomalyScore,
+        bool isAnomaly) =>
+        new()
+        {
+            ServiceName = serviceName,
+            InstanceId = instanceId ?? string.Empty,
+            MetricName = metricName,
+            Value = point.Value,
+            ExpectedValue = expectedValue,
+            AnomalyScore = anomalyScore,
+            IsAnomaly = isAnomaly,
+            DetectedAt = point.Timestamp
+        };
+
+    private static double StandardDeviation(double[] values)
+    {
+        var mean = values.Average();
+        var variance = values.Select(v => Math.Pow(v - mean, 2)).Average();
+        return Math.Sqrt(variance);
+    }
+    
+    private class TimeSeriesInput
+    {
+        public float Value { get; set; }
+    }
+}
