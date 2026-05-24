@@ -10,8 +10,8 @@ public class ApiKeyMiddleware(RequestDelegate next)
     {
         "/health",
         "/swagger",
-        "/hubs/metrics",
-        "/api/key"
+        "/hub/metrics",
+        "/api/keys"
     };
 
     public async Task InvokeAsync(HttpContext context, IApiKeysRepository apiKeysRepository)

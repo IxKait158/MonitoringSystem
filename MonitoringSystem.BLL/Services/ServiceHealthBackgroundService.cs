@@ -3,7 +3,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MonitoringSystem.BLL.Interfaces.Services;
-using MonitoringSystem.BLL.Models;
 using MonitoringSystem.BLL.Models.Services;
 
 namespace MonitoringSystem.BLL.Services;
@@ -32,7 +31,7 @@ public class ServiceHealthBackgroundService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to refresh service health statuses.");
+                logger.LogError(ex, "Не вдалося оновити стан справності служби");
             }
         }
     }

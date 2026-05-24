@@ -1,4 +1,4 @@
-﻿const API_URL = 'http://localhost:5169';
+﻿const API_URL = window.location.origin;
 const MAX_POINTS = 30;
 
 Chart.defaults.color = '#64748b';

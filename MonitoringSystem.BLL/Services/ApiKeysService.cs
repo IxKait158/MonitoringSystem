@@ -18,7 +18,7 @@ public class ApiKeysService(IApiKeysRepository apiKeysRepository) : IApiKeysServ
         {
             Key = key,
             ServiceName = request.ServiceName,
-            Owner = request.Owner ?? "unknown",
+            Owner = string.IsNullOrEmpty(request.Owner) ? "unknown" : request.Owner,
             IsActive = true
         };
         

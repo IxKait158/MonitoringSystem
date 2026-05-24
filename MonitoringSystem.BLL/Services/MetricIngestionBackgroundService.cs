@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MonitoringSystem.BLL.Interfaces.Services;
-using MonitoringSystem.BLL.Models;
 using MonitoringSystem.BLL.Models.Metrics;
 
 namespace MonitoringSystem.BLL.Services;
@@ -38,7 +37,7 @@ public class MetricIngestionBackgroundService(
             {
                 logger.LogError(
                     ex,
-                    "Failed to ingest queued metrics for service {ServiceName}. Metrics count: {MetricsCount}",
+                    "Не вдалося отримати показники з черги для служби {ServiceName}. Кількість показників: {MetricsCount}",
                     request.ServiceName,
                     request.Metrics.Count);
             }

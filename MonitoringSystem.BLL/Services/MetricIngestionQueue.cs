@@ -1,13 +1,12 @@
 using System.Threading.Channels;
 using MonitoringSystem.BLL.Interfaces.Services;
-using MonitoringSystem.BLL.Models;
 using MonitoringSystem.BLL.Models.Metrics;
 
 namespace MonitoringSystem.BLL.Services;
 
 public class MetricIngestionQueue : IMetricIngestionQueue
 {
-    private readonly Channel<MetricIngestionRequest> queue = Channel.CreateBounded<MetricIngestionRequest>(
+    private readonly Channel<MetricIngestionRequest> _queue = Channel.CreateBounded<MetricIngestionRequest>(
         new BoundedChannelOptions(1_000)
         {
             FullMode = BoundedChannelFullMode.Wait,
@@ -16,8 +15,8 @@ public class MetricIngestionQueue : IMetricIngestionQueue
         });
 
     public ValueTask QueueAsync(MetricIngestionRequest request, CancellationToken cancellationToken = default) =>
-        queue.Writer.WriteAsync(request, cancellationToken);
+        _queue.Writer.WriteAsync(request, cancellationToken);
 
     public ValueTask<MetricIngestionRequest> DequeueAsync(CancellationToken cancellationToken) =>
-        queue.Reader.ReadAsync(cancellationToken);
+        _queue.Reader.ReadAsync(cancellationToken);
 }

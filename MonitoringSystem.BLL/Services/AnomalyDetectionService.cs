@@ -11,7 +11,7 @@ namespace MonitoringSystem.BLL.Services;
 /// <summary>
 /// Виявлення аномалій:
 /// 1. Z-score для online-аналізу.
-/// 2. Z-score, moving average, EWMA та ML.NET SrCnn для batch-порівняння.
+/// 2. ML.NET SrCnn для пакетного аналізу даних.
 /// </summary>
 public class AnomalyDetectionService(
     MLContext mlContext,
@@ -22,9 +22,6 @@ public class AnomalyDetectionService(
     private const int WindowSize = 30;
     private const int MinHistorySize = 5;
     private const double ZScoreThreshold = 2.5;
-    private const double MovingAverageRelativeThreshold = 0.6;
-    private const double EwmaAlpha = 0.3;
-    private const double EwmaResidualThreshold = 3.0;
 
     public AnomalyResult Analyze(MetricPoint point)
     {
@@ -60,7 +57,7 @@ public class AnomalyDetectionService(
                     if (result.IsAnomaly)
                     {
                         logger.LogInformation(
-                            "Anomaly detected for {ServiceName}:{MetricName}, value={Value}, Z-Score={ZScore:F2}",
+                            "Виявлено аномалію для {ServiceName}:{MetricName}, value={Value}, Z-Score={ZScore:F2}",
                             point.ServiceName,
                             point.MetricName,
                             result.Value,
@@ -89,13 +86,7 @@ public class AnomalyDetectionService(
         {
             BuildComparisonResult(
                 "Z-score",
-                AnalyzeBatchWithZScore(serviceName, metricName, orderedSeries)),
-            BuildComparisonResult(
-                "Moving average",
-                AnalyzeBatchWithMovingAverage(serviceName, metricName, orderedSeries)),
-            BuildComparisonResult(
-                "EWMA",
-                AnalyzeBatchWithEwma(serviceName, metricName, orderedSeries))
+                AnalyzeBatchWithZScore(serviceName, metricName, orderedSeries))
         };
 
         var srCnnResults = AnalyzeBatchWithMlNet(serviceName, metricName, orderedSeries);
@@ -142,88 +133,7 @@ public class AnomalyDetectionService(
 
         return results;
     }
-
-    private List<AnomalyResult> AnalyzeBatchWithMovingAverage(
-        string serviceName, string metricName,
-        List<(DateTime Timestamp, double Value)> timeSeries)
-    {
-        var results = new List<AnomalyResult>();
-
-        for (var i = 0; i < timeSeries.Count; i++)
-        {
-            var point = timeSeries[i];
-            var history = timeSeries
-                .Skip(Math.Max(0, i - WindowSize))
-                .Take(Math.Min(WindowSize, i))
-                .Select(x => x.Value)
-                .ToArray();
-
-            if (history.Length < MinHistorySize)
-                continue;
-
-            var movingAverage = history.Average();
-            var denominator = Math.Max(Math.Abs(movingAverage), 1.0);
-            var relativeDeviation = Math.Abs(point.Value - movingAverage) / denominator;
-            var anomalyScore = Math.Min(relativeDeviation / MovingAverageRelativeThreshold, 1.0);
-
-            results.Add(CreateBatchResult(
-                serviceName,
-                metricName,
-                point,
-                movingAverage,
-                anomalyScore,
-                relativeDeviation > MovingAverageRelativeThreshold));
-        }
-
-        return results;
-    }
-
-    private List<AnomalyResult> AnalyzeBatchWithEwma(
-        string serviceName, string metricName,
-        List<(DateTime Timestamp, double Value)> timeSeries)
-    {
-        var results = new List<AnomalyResult>();
-        if (timeSeries.Count == 0)
-            return results;
-
-        var expected = timeSeries[0].Value;
-        var residualHistory = new Queue<double>();
-
-        foreach (var point in timeSeries)
-        {
-            var residual = Math.Abs(point.Value - expected);
-
-            if (residualHistory.Count >= MinHistorySize)
-            {
-                var residuals = residualHistory.ToArray();
-                var residualMean = residuals.Average();
-                var residualStd = StandardDeviation(residuals);
-
-                if (residualStd > 0)
-                {
-                    var residualScore = Math.Abs((residual - residualMean) / residualStd);
-                    var anomalyScore = Math.Min(residualScore / EwmaResidualThreshold, 1.0);
-
-                    results.Add(CreateBatchResult(
-                        serviceName,
-                        metricName,
-                        point,
-                        expected,
-                        anomalyScore,
-                        residualScore > EwmaResidualThreshold));
-                }
-            }
-
-            residualHistory.Enqueue(residual);
-            if (residualHistory.Count > WindowSize)
-                residualHistory.Dequeue();
-
-            expected = EwmaAlpha * point.Value + (1 - EwmaAlpha) * expected;
-        }
-
-        return results;
-    }
-
+    
     /// <summary>
     /// ML.NET підхід — SrCnn алгоритм для часових рядів.
     /// Використовується для пакетного аналізу історичних даних.
