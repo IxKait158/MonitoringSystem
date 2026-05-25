@@ -154,6 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const now = new Date();
     const hourAgo = new Date(now - 3600_000);
-    document.getElementById('met-to').value   = now.toISOString().slice(0, 16);
-    document.getElementById('met-from').value = hourAgo.toISOString().slice(0, 16);
+    document.getElementById('met-to').value   = toLocalInputValue(now);
+    document.getElementById('met-from').value = toLocalInputValue(hourAgo);
 });

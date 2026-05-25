@@ -69,6 +69,12 @@ nav {
 .nav-btn:hover { color: var(--text); border-color: var(--border2); background: var(--surface2); }
 .nav-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(56,189,248,.08); }
 .nav-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+.nav-btn.nav-locked,
+.nav-btn[disabled] {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
 
 /* Стан підключення */
 #connection-status { display: flex; align-items: center; gap: 8px; font-size: 12px; font-family: var(--mono); }

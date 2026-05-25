@@ -4,10 +4,17 @@
 async function keysLoad() {
     const infoBox = document.getElementById('key-info');
     const servicesBody = document.getElementById('services-tbody');
+    const hasKey = !!getApiKey();
 
-    if (!getApiKey()) {
-        infoBox.innerHTML = `<div class="empty">Введіть API ключ у полі вгорі сторінки, щоб побачити свій профіль.</div>`;
-        servicesBody.innerHTML = `<tr><td colspan="3" class="empty">—</td></tr>`;
+    // Перемикаємо видимість блоків: без ключа — лише форма "Створити ключ"
+    document.querySelectorAll('#page-keys [data-needs-key]').forEach(el => {
+        el.style.display = hasKey ? '' : 'none';
+    });
+
+    if (!hasKey) {
+        if (infoBox) {
+            infoBox.innerHTML = `<div class="empty">Ви не увійшли. Згенеруйте новий ключ нижче або введіть існуючий у полі вгорі.</div>`;
+        }
         return;
     }
 
@@ -149,11 +156,32 @@ function headerApiKeySave() {
     }
 }
 
+// Вийти з ключа — очищає localStorage і перезавантажує
+function headerApiKeyLogout() {
+    if (!confirm('Вийти з поточного API ключа? Дашборд перестане отримувати ваші дані до повторного входу.')) return;
+    setApiKey('');
+    const input = document.getElementById('header-api-key');
+    if (input) input.value = '';
+    toast('Ви вийшли — перезавантажуємо...', 'info');
+    setTimeout(() => location.reload(), 400);
+}
+
 // Init
 document.addEventListener('DOMContentLoaded', () => {
     const saved = getApiKey();
-    if (saved) {
-        const el = document.getElementById('header-api-key');
-        if (el) el.value = saved;
+    const input = document.getElementById('header-api-key');
+    const logoutBtn = document.getElementById('header-logout-btn');
+
+    if (saved && input) input.value = saved;
+    if (logoutBtn) logoutBtn.style.display = saved ? 'inline-flex' : 'none';
+
+    // Блокуємо навігацію на закриті сторінки, якщо ключа немає
+    if (typeof refreshNavLockState === 'function') refreshNavLockState();
+
+    // Якщо ми зайшли без ключа на сторінку, де він потрібен — перекидаємо на дашборд
+    const currentBtn = document.querySelector('.nav-btn.active');
+    const currentPage = currentBtn?.dataset.page;
+    if (!saved && currentPage && !isPagePublic(currentPage)) {
+        showPage('dashboard');
     }
 });

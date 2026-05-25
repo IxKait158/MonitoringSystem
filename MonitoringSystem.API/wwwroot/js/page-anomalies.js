@@ -132,8 +132,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Дефолт: остання година
     const now = new Date();
     const hourAgo = new Date(now - 3600_000);
-    document.getElementById('an-to').value   = now.toISOString().slice(0, 16);
-    document.getElementById('an-from').value = hourAgo.toISOString().slice(0, 16);
-    document.getElementById('cmp-to').value   = now.toISOString().slice(0, 16);
-    document.getElementById('cmp-from').value = new Date(now - 86400_000).toISOString().slice(0, 16);
+    document.getElementById('an-to').value   = toLocalInputValue(now);
+    document.getElementById('an-from').value = toLocalInputValue(hourAgo);
+    document.getElementById('cmp-to').value   = toLocalInputValue(now);
+    document.getElementById('cmp-from').value = toLocalInputValue(new Date(now - 86400_000));
 });

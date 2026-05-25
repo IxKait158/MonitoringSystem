@@ -41,11 +41,11 @@ async function srcnnInit() {
         }
     } catch { }
 
-    // Дефолтні дати: остання доба
+    // Дефолтні дати: остання доба (в локальному часі ПК)
     const now = new Date();
     const dayAgo = new Date(now - 86_400_000);
-    document.getElementById('src-to').value = now.toISOString().slice(0, 16);
-    document.getElementById('src-from').value = dayAgo.toISOString().slice(0, 16);
+    document.getElementById('src-to').value = toLocalInputValue(now);
+    document.getElementById('src-from').value = toLocalInputValue(dayAgo);
 }
 
 // Запуск SrCnn аналізу

@@ -88,6 +88,16 @@
                     <polyline points="7 3 7 8 15 8"/>
                 </svg>
             </button>
+            <button id="header-logout-btn" class="btn btn-danger" style="padding:6px 10px;display:none"
+                    onclick="headerApiKeyLogout()" title="Вийти з ключа">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     style="width:13px;height:13px">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Вийти
+            </button>
         </div>
         <div id="connection-status">
             <div class="dot" id="dot"></div>
@@ -127,7 +137,7 @@
     </div>
 
     <!-- МЕТРИКИ  -->
-    <div id="page-metrics" class="page">
+    <div id="page-metrics" class="page" >
 
         <!-- Статус сервісів -->
         <div class="card">
@@ -572,7 +582,7 @@
     <div id="page-keys" class="page">
 
         <!-- Інформація про поточний ключ -->
-        <div class="card">
+        <div class="card" data-needs-key>
             <div class="card-title">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
@@ -586,7 +596,7 @@
         </div>
 
         <!-- Реєстрація сервісу -->
-        <div class="card">
+        <div class="card" data-needs-key>
             <div class="card-title">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"/>
@@ -608,7 +618,7 @@
         </div>
 
         <!-- Список сервісів цього ключа -->
-        <div class="card">
+        <div class="card" data-needs-key>
             <div class="card-title">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="7" height="7" rx="1"/>
