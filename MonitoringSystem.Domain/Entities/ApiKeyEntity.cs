@@ -1,4 +1,5 @@
-﻿using MonitoringSystem.Domain.Interfaces;
+﻿
+using MonitoringSystem.BLL.Interfaces.Entities;
 
 namespace MonitoringSystem.Domain.Entities;
 

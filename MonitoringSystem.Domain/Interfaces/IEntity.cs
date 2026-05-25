@@ -1,4 +1,4 @@
-﻿namespace MonitoringSystem.Domain.Interfaces;
+﻿namespace MonitoringSystem.BLL.Interfaces.Entities;
 
 public interface IEntity
 {

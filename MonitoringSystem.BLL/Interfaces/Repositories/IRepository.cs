@@ -1,5 +1,5 @@
 ﻿using System.Linq.Expressions;
-using MonitoringSystem.Domain.Interfaces;
+using MonitoringSystem.BLL.Interfaces.Entities;
 
 namespace MonitoringSystem.BLL.Interfaces.Repositories;
 

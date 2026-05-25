@@ -3,45 +3,481 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Моніторинг мікросервісів</title>
-    <link href="styles/main.css" rel="stylesheet">
+    <title>MonitorSys — Моніторинг мікросервісів</title>
+    <link rel="stylesheet" href="css/main.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
-
 <body>
+
+<!-- Header -->
 <header>
     <div class="logo">MONITOR<span>.SYS</span></div>
-    <div id="connection-status">
-        <div class="dot" id="dot"></div>
-        <span id="status-text">Підключення...</span>
+
+    <nav>
+        <!-- Дашборд -->
+        <button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            Дашборд
+        </button>
+
+        <!-- Метрики -->
+        <button class="nav-btn" data-page="metrics" onclick="showPage('metrics'); servicesStatusLoad();">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            Метрики
+        </button>
+
+        <!-- Аномалії -->
+        <button class="nav-btn" data-page="anomalies" onclick="showPage('anomalies'); anomaliesLoad();">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            Аномалії
+        </button>
+
+        <!-- Порівняння алгоритмів -->
+        <button class="nav-btn" data-page="compare" onclick="showPage('compare');">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            Алгоритми
+        </button>
+
+        <!-- API ключі -->
+        <button class="nav-btn" data-page="keys" onclick="showPage('keys'); keysLoad();">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+            </svg>
+            API Ключі
+        </button>
+    </nav>
+
+    <div style="display:flex;align-items:center;gap:10px">
+        <!-- Швидке поле API ключа -->
+        <div style="display:flex;gap:6px;align-items:center">
+            <input id="header-api-key" type="password" placeholder="X-API-KEY" autocomplete="off"
+                   style="width:160px;padding:6px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none"
+                   onkeydown="if(event.key==='Enter') headerApiKeySave()">
+            <button class="btn btn-ghost" style="padding:6px 10px" onclick="headerApiKeySave()" title="Зберегти ключ">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     style="width:13px;height:13px">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/>
+                    <polyline points="7 3 7 8 15 8"/>
+                </svg>
+            </button>
+        </div>
+        <div id="connection-status">
+            <div class="dot" id="dot"></div>
+            <span id="status-text">Підключення...</span>
+        </div>
     </div>
 </header>
 
+<div id="toast"></div>
+
+<!-- ДАШБОРД (real-time)  -->
 <main>
-    <div class="services-grid" id="services-grid">
-        <div style="color:var(--muted); font-size:13px; font-family:var(--mono)">Очікування даних...</div>
+    <div id="page-dashboard" class="page active">
+
+        <div class="services-grid" id="services-grid">
+            <div class="empty" style="padding:12px 0">Очікування даних від симулятора...</div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">⚡ Час відповіді (ms)</div>
+                <canvas id="responseTimeChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">🧠 Пам'ять (MB)</div>
+                <canvas id="memoryChart"></canvas>
+            </div>
+        </div>
+
+        <div class="anomalies-panel">
+            <div class="panel-title">⚠ Аномалії в реальному часі</div>
+            <div id="anomaly-list">
+                <div class="empty" data-stub>Аномалій не виявлено</div>
+            </div>
+        </div>
+
     </div>
 
-    <div class="charts-grid">
-        <div class="chart-card">
-            <div class="chart-title">Час відповіді (ms)</div>
-            <canvas id="responseTimeChart"></canvas>
+    <!-- МЕТРИКИ  -->
+    <div id="page-metrics" class="page">
+
+        <!-- Статус сервісів -->
+        <div class="card">
+            <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Статус сервісів
+                <button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px" onclick="servicesStatusLoad()">↻
+                    Оновити
+                </button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Сервіс</th>
+                        <th>Статус</th>
+                        <th>Response Time</th>
+                        <th>Memory</th>
+                        <th>Аномалії</th>
+                    </tr>
+                    </thead>
+                    <tbody id="svc-tbody">
+                    <tr>
+                        <td colspan="5" class="empty loading">Завантаження...</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <div class="chart-card">
-            <div class="chart-title">Пам'ять (MB)</div>
-            <canvas id="memoryChart"></canvas>
+
+        <!-- Запит метрик -->
+        <div class="card">
+            <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Пошук метрик за часовим діапазоном
+            </div>
+            <div class="form-grid">
+                <div class="filters-bar">
+                    <div class="form-group">
+                        <label>Сервіс</label>
+                        <select id="met-service">
+                            <option value="">Завантаження...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Метрика</label>
+                        <select id="met-metric"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Від</label>
+                        <input type="datetime-local" id="met-from">
+                    </div>
+                    <div class="form-group">
+                        <label>До</label>
+                        <input type="datetime-local" id="met-to">
+                    </div>
+                    <div class="form-group" style="justify-content:flex-end">
+                        <label>&nbsp;</label>
+                        <button id="met-load-btn" class="btn btn-primary" onclick="metricsLoad()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                 style="width:13px;height:13px">
+                                <circle cx="11" cy="11" r="8"/>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                            Завантажити
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Графік результату -->
+            <div id="met-chart-wrap" style="display:none;margin-top:18px">
+                <canvas id="met-chart" style="max-height:220px"></canvas>
+            </div>
+
+            <!-- Таблиця результату -->
+            <div class="table-wrap" style="margin-top:14px">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Час</th>
+                        <th>Сервіс</th>
+                        <th>Метрика</th>
+                        <th>Значення</th>
+                    </tr>
+                    </thead>
+                    <tbody id="met-tbody">
+                    <tr>
+                        <td colspan="4" class="empty">Оберіть параметри і натисніть «Завантажити»</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
+
     </div>
 
-    <div class="anomalies-panel">
-        <div class="panel-title">⚠ Виявлені аномалії</div>
-        <div id="anomaly-list">
-            <div style="color:var(--muted);font-size:12px;font-family:var(--mono)">Аномалій не виявлено</div>
+    <!-- АНОМАЛІЇ (архів + фільтри)  -->
+    <div id="page-anomalies" class="page">
+
+        <div class="card">
+            <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Архів аномалій
+            </div>
+
+            <div class="filters-bar">
+                <div class="form-group">
+                    <label>Сервіс</label>
+                    <select id="an-service">
+                        <option value="">Всі сервіси</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Від</label>
+                    <input type="datetime-local" id="an-from">
+                </div>
+                <div class="form-group">
+                    <label>До</label>
+                    <input type="datetime-local" id="an-to">
+                </div>
+                <div class="form-group">
+                    <label>Кількість записів</label>
+                    <input type="number" id="an-count" value="50" min="1" max="500" style="width:90px">
+                </div>
+                <div class="form-group" style="justify-content:flex-end">
+                    <label>&nbsp;</label>
+                    <button id="an-load-btn" class="btn btn-primary" onclick="anomaliesLoad()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                             style="width:13px;height:13px">
+                            <path d="M4 12v-2a8 8 0 1 1 16 0v2"/>
+                        </svg>
+                        Завантажити
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-wrap" style="margin-top:16px">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Час виявлення</th>
+                        <th>Сервіс</th>
+                        <th>Метрика</th>
+                        <th>Значення</th>
+                        <th>Очікувалось</th>
+                        <th>Рівень</th>
+                    </tr>
+                    </thead>
+                    <tbody id="an-tbody">
+                    <tr>
+                        <td colspan="6" class="empty">Натисніть «Завантажити»</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
+
+    </div>
+
+    <!-- ПОРІВНЯННЯ АЛГОРИТМІВ  -->
+    <div id="page-compare" class="page">
+
+        <div class="card">
+            <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"/>
+                    <line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                Порівняння Z-score vs SrCnn
+            </div>
+
+            <p style="font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.7">
+                Запустить аналіз одного часового ряду двома алгоритмами одночасно та поверне метрики точності.
+                Для коректного результату потрібно мати достатньо даних у вказаному діапазоні (≥ 30 точок).
+            </p>
+
+            <div class="form-grid">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Назва сервісу</label>
+                        <input type="text" id="cmp-service" placeholder="OrderService">
+                    </div>
+                    <div class="form-group">
+                        <label>Метрика</label>
+                        <input type="text" id="cmp-metric" placeholder="http.response_time_ms">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Від</label>
+                        <input type="datetime-local" id="cmp-from">
+                    </div>
+                    <div class="form-group">
+                        <label>До</label>
+                        <input type="datetime-local" id="cmp-to">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button id="cmp-btn" class="btn btn-primary" onclick="compareAlgorithms()">Порівняти</button>
+                    <span style="font-size:11px;color:var(--muted)">POST /api/anomalies/compare</span>
+                </div>
+            </div>
+
+            <div id="cmp-result" style="margin-top:16px">
+                <div class="empty">Заповніть параметри та натисніть «Порівняти»</div>
+            </div>
+        </div>
+
+        <!-- Пояснення методів -->
+        <div class="charts-grid">
+            <div class="card">
+                <div class="card-title" style="color:var(--accent)">Z-score — real-time</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.8">
+                    <div class="stat-row"><span class="stat-label">Режим</span><span class="stat-value"
+                                                                                     style="color:var(--green)">Потоковий (O(1))</span>
+                    </div>
+                    <div class="stat-row"><span class="stat-label">Навчання</span><span
+                            class="stat-value">Не потрібне</span></div>
+                    <div class="stat-row"><span class="stat-label">Вікно</span><span class="stat-value">30 точок</span>
+                    </div>
+                    <div class="stat-row"><span class="stat-label">Поріг</span><span class="stat-value">2.5σ</span>
+                    </div>
+                    <div class="stat-row"><span class="stat-label">Тип аномалій</span><span
+                            class="stat-value">Точкові</span></div>
+                    <div class="stat-row"><span class="stat-label">Сезонність</span><span class="stat-value"
+                                                                                          style="color:var(--red)">Ні</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title" style="color:var(--purple)">SrCnn — пакетний</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.8">
+                    <div class="stat-row"><span class="stat-label">Режим</span><span class="stat-value"
+                                                                                     style="color:var(--yellow)">Пакетний (O(n·logn))</span>
+                    </div>
+                    <div class="stat-row"><span class="stat-label">Навчання</span><span
+                            class="stat-value">Не потрібне</span></div>
+                    <div class="stat-row"><span class="stat-label">Алгоритм</span><span class="stat-value">FFT + CNN (KDD 2019)</span>
+                    </div>
+                    <div class="stat-row"><span class="stat-label">Поріг</span><span class="stat-value">0.3</span></div>
+                    <div class="stat-row"><span class="stat-label">Тип аномалій</span><span
+                            class="stat-value">Всі типи</span></div>
+                    <div class="stat-row"><span class="stat-label">Сезонність</span><span class="stat-value"
+                                                                                          style="color:var(--green)">Так</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- СТОРІНКА: API КЛЮЧІ -->
+    <div id="page-keys" class="page">
+
+        <!-- Форма створення -->
+        <div class="card">
+            <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                    <path d="M4.93 4.93a10 10 0 0 0 0 14.14"/>
+                </svg>
+                Новий API ключ
+            </div>
+            <div class="form-row" style="max-width:600px">
+                <div class="form-group">
+                    <label>Назва сервісу *</label>
+                    <input type="text" id="key-service" placeholder="OrderService"
+                           onkeydown="if(event.key==='Enter') keysCreate()">
+                </div>
+                <div class="form-group">
+                    <label>Власник (необов'язково)</label>
+                    <input type="text" id="key-owner" placeholder="backend-team"
+                           onkeydown="if(event.key==='Enter') keysCreate()">
+                </div>
+            </div>
+            <div class="btn-row" style="margin-top:10px">
+                <button id="key-create-btn" class="btn btn-primary" onclick="keysCreate()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    Створити ключ
+                </button>
+                <span style="font-size:11px;color:var(--muted)">POST /api/keys</span>
+            </div>
+        </div>
+
+        <!-- Список ключів -->
+        <div class="card">
+            <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                </svg>
+                Всі ключі
+                <button class="btn btn-ghost" style="margin-left:auto;padding:5px 10px" onclick="keysLoad()">↻ Оновити
+                </button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Сервіс</th>
+                        <th>Власник</th>
+                        <th>Ключ (preview)</th>
+                        <th>Статус</th>
+                        <th>Останнє використання</th>
+                        <th>Дія</th>
+                    </tr>
+                    </thead>
+                    <tbody id="keys-tbody">
+                    <tr>
+                        <td colspan="7" class="empty loading">Завантаження...</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 </main>
 
-<script src="js/chart.js"></script>
+<!-- МОДАЛКА: Показ нового API ключа -->
+<div id="key-modal" class="modal-overlay" onclick="if(event.target===this) keysCloseModal()">
+    <div class="modal">
+        <div class="modal-title">🔑 Новий ключ для <span id="modal-key-service"></span></div>
+        <div class="modal-warn">
+            ⚠ Збережіть цей ключ зараз — після закриття він більше не буде показаний повністю.
+        </div>
+        <div class="key-box" id="modal-key-value"></div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:16px" id="modal-key-usage"></div>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="copyText(document.getElementById('modal-key-value').textContent)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     style="width:13px;height:13px">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Копіювати ключ
+            </button>
+            <button class="btn btn-ghost" onclick="keysCloseModal()">Закрити</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/page-metrics.js"></script>
+<script src="js/page-anomalies.js"></script>
+<script src="js/page-keys.js"></script>
+<script src="js/signalr-handler.js"></script>
 </body>
 </html>
