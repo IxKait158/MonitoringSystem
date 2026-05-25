@@ -1,4 +1,3 @@
-// API_URL береться з config.js
 const MAX_POINTS = 30;
 
 Chart.defaults.color = '#64748b';
@@ -40,21 +39,10 @@ function addChartPoint(chart, value) {
     chart.update('none');
 }
 
-// ===== Рендеринг (спільний для REST initial-load і SignalR push) =====
 
-function renderServices(statuses) {
     const grid = document.getElementById('services-grid');
-    if (!statuses?.length) {
-        grid.innerHTML = `<div class="empty" style="padding:12px 0">Очікування даних від симулятора...</div>`;
-        return;
-    }
-    grid.innerHTML = statuses.map(s => {
-        const rt  = s.latestMetrics?.['http.response_time_ms'] ?? 0;
-        const mem = s.latestMetrics?.['system.memory_mb'] ?? 0;
-        const cpu = s.latestMetrics?.['system.cpu_percent'] ?? 0;
         const rtClass  = rt  > 1000 ? 'crit' : rt  > 200 ? 'warn' : 'ok';
         const cpuClass = cpu > 80   ? 'crit' : cpu > 50  ? 'warn' : 'ok';
-        return `
           <div class="service-card ${s.anomalyCount > 0 ? 'anomaly' : ''} ${s.isHealthy ? '' : 'unhealthy'}">
             <div class="service-name">${s.serviceName}</div>
             <div class="metric-row"><span class="metric-label">Response Time</span><span class="metric-value ${rtClass}">${rt.toFixed(0)}ms</span></div>
@@ -63,39 +51,16 @@ function renderServices(statuses) {
             <div class="metric-row"><span class="metric-label">Health</span><span class="metric-value ${s.isHealthy ? 'ok' : 'warn'}">${s.isHealthy ? 'Healthy' : 'Unhealthy'}</span></div>
             <div class="metric-row"><span class="metric-label">Аномалії</span><span class="metric-value ${s.anomalyCount > 0 ? 'crit' : 'ok'}">${s.anomalyCount}</span></div>
           </div>`;
-    }).join('');
-}
 
-function prependAnomaly(a) {
     const list = document.getElementById('anomaly-list');
-    // Прибираємо placeholder при першій реальній аномалії
-    const stub = list.querySelector('[data-stub]');
-    if (stub) stub.remove();
 
-    const time = a.detectedAt ? new Date(a.detectedAt).toLocaleTimeString('uk') : new Date().toLocaleTimeString('uk');
     const item = document.createElement('div');
     item.className = 'anomaly-item';
     item.innerHTML = `
       <span class="anomaly-severity severity-${a.severity}">${a.severity}</span>
       <span class="anomaly-service">${a.serviceName}</span>
-      <span class="anomaly-details">${a.metricName}: ${a.value.toFixed(2)} (очікувалось ~${(a.expectedValue ?? 0).toFixed(2)})</span>
-      <span class="anomaly-time">${time}</span>`;
     list.prepend(item);
     if (list.children.length > 20) list.lastChild.remove();
-}
-
-// ===== SignalR =====
-
-const hubUrl = `${API_URL.replace(/\/+$/, '')}/hub/metrics`;
-const connection = new signalR.HubConnectionBuilder()
-    .withUrl(hubUrl)
-    .withAutomaticReconnect()
-    .build();
-
-connection.on('MetricsUpdated', (metrics) => {
-    metrics.forEach(m => {
-        if (m.metricName === 'http.response_time_ms') addChartPoint(rtChart, m.value);
-        if (m.metricName === 'system.memory_mb') addChartPoint(memChart, m.value);
     });
 });
 
