@@ -10,7 +10,7 @@ namespace MonitoringSystem.Controllers;
 public class ApiKeysController(IApiKeysService apiKeysService) : ControllerBase
 {
     private ApiKeyEntity? CurrentApiKey =>
-        HttpContext.Items["ApiKey"] as ApiKeyEntity;
+        HttpContext.Items["ApiKeyDTO"] as ApiKeyEntity;
 
     /// <summary>
     /// Створює новий API ключ для користувача. Не потребує авторизації.

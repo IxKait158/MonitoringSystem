@@ -1,4 +1,4 @@
-using MonitoringSystem.BLL.Models.Anomalies;
+﻿using MonitoringSystem.BLL.Models.Anomalies;
 using MonitoringSystem.BLL.Models.Metrics;
 using MonitoringSystem.BLL.Models.Services;
 using MonitoringSystem.Domain.Entities;
@@ -9,7 +9,7 @@ public interface IMetricsService
 {
     Task IngestAsync(ApiKeyEntity apiKey, MetricIngestionRequest request);
 
-    Task<List<MetricPoint>> GetMetricsAsync(
+    Task<List<MetricPointDTO>> GetMetricsAsync(
         ApiKeyEntity apiKey,
         string serviceName,
         string metricName,

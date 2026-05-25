@@ -23,9 +23,9 @@ public class AnomalyDetectionService(
     private const int MinHistorySize = 5;
     private const double ZScoreThreshold = 2.5;
 
-    public AnomalyResult Analyze(int serviceId, string serviceName, MetricPoint point)
+    public AnomalyResult Analyze(int serviceId, string serviceName, MetricPointDTO pointDto)
     {
-        var key = $"{serviceId}:{point.MetricName}";
+        var key = $"{serviceId}:{pointDto.MetricName}";
         var history = _metricHistory.GetOrAdd(key, _ => new Queue<double>());
         var historyLock = _historyLocks.GetOrAdd(key, _ => new object());
 
@@ -33,10 +33,10 @@ public class AnomalyDetectionService(
         {
             var result = new AnomalyResult
             {
-                MetricPointId = point.Id,
+                MetricPointId = pointDto.Id,
                 ServiceName = serviceName,
-                MetricName = point.MetricName,
-                Value = point.Value,
+                MetricName = pointDto.MetricName,
+                Value = pointDto.Value,
                 DetectedAt = DateTime.UtcNow
             };
 
@@ -50,7 +50,7 @@ public class AnomalyDetectionService(
 
                 if (std > 0)
                 {
-                    var zScore = Math.Abs((point.Value - mean) / std);
+                    var zScore = Math.Abs((pointDto.Value - mean) / std);
                     result.AnomalyScore = Math.Min(zScore / ZScoreThreshold, 1.0);
                     result.IsAnomaly = zScore > ZScoreThreshold;
 
@@ -59,14 +59,14 @@ public class AnomalyDetectionService(
                         logger.LogInformation(
                             "Виявлено аномалію для {ServiceName}:{MetricName}, value={Value}, Z-Score={ZScore:F2}",
                             serviceName,
-                            point.MetricName,
+                            pointDto.MetricName,
                             result.Value,
                             zScore);
                     }
                 }
             }
 
-            history.Enqueue(point.Value);
+            history.Enqueue(pointDto.Value);
             if (history.Count > WindowSize)
                 history.Dequeue();
 

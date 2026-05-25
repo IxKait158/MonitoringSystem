@@ -53,6 +53,4 @@ app.UseApiKeyAuth();
 app.MapControllers();
 app.MapHub<MetricsHub>("/hub/metrics");
 
-app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
-
 app.Run();

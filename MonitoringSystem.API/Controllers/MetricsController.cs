@@ -10,7 +10,7 @@ namespace MonitoringSystem.Controllers;
 public class MetricsController(IMetricsService metricsService) : ControllerBase
 {
     private ApiKeyEntity CurrentApiKey =>
-        (ApiKeyEntity)HttpContext.Items["ApiKey"]!;
+        (ApiKeyEntity)HttpContext.Items["ApiKeyDTO"]!;
 
     /// <summary>
     /// Прийом метрик від користувацького сервісу за X-API-KEY.

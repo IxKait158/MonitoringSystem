@@ -7,7 +7,7 @@ public interface IApiKeysService
 {
     Task<string> CreateAsync(CreateApiKeyRequest request);
 
-    ApiKey GetCurrent(ApiKeyEntity apiKey);
+    ApiKeyDTO GetCurrent(ApiKeyEntity apiKey);
 
-    Task<ApiKey> DeactivateApiKeyAsync(int id);
+    Task<ApiKeyDTO> DeactivateApiKeyAsync(int id);
 }

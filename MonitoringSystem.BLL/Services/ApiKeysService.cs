@@ -1,4 +1,4 @@
-using MonitoringSystem.BLL.Interfaces.Repositories;
+﻿using MonitoringSystem.BLL.Interfaces.Repositories;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models.ApiKeys;
 using MonitoringSystem.Domain.Entities;
@@ -23,7 +23,7 @@ public class ApiKeysService(IApiKeysRepository apiKeysRepository) : IApiKeysServ
         return key;
     }
 
-    public ApiKey GetCurrent(ApiKeyEntity apiKey) =>
+    public ApiKeyDTO GetCurrent(ApiKeyEntity apiKey) =>
         new()
         {
             Id = apiKey.Id,
@@ -35,7 +35,7 @@ public class ApiKeysService(IApiKeysRepository apiKeysRepository) : IApiKeysServ
             ServiceCount = apiKey.Services?.Count ?? 0
         };
 
-    public async Task<ApiKey> DeactivateApiKeyAsync(int id)
+    public async Task<ApiKeyDTO> DeactivateApiKeyAsync(int id)
     {
         var key = await apiKeysRepository.GetByIdAsync(id);
         if (key == null)
@@ -44,7 +44,7 @@ public class ApiKeysService(IApiKeysRepository apiKeysRepository) : IApiKeysServ
         key.IsActive = false;
         await apiKeysRepository.UpdateAsync(key);
 
-        return new ApiKey
+        return new ApiKeyDTO
         {
             Id = key.Id,
             Key = key.Key[..8] + "...",

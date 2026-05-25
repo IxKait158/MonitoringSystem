@@ -41,7 +41,7 @@ public class ApiKeyMiddleware(RequestDelegate next)
             return;
         }
 
-        context.Items["ApiKey"] = apiKey;
+        context.Items["ApiKeyDTO"] = apiKey;
 
         apiKey.LastUsedAt = DateTime.UtcNow;
         await apiKeysRepository.UpdateAsync(apiKey);

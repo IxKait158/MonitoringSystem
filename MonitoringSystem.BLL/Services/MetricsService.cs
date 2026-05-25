@@ -75,7 +75,7 @@ public class MetricsService(
             .SendAsync("ServiceStatusUpdated", await GetServiceStatusesAsync(apiKey));
     }
 
-    public async Task<List<MetricPoint>> GetMetricsAsync(
+    public async Task<List<MetricPointDTO>> GetMetricsAsync(
         ApiKeyEntity apiKey,
         string serviceName,
         string metricName,
@@ -84,7 +84,7 @@ public class MetricsService(
     {
         var service = await servicesRepository.FindByApiKeyAndNameAsync(apiKey.Id, serviceName);
         if (service == null)
-            return new List<MetricPoint>();
+            return new List<MetricPointDTO>();
 
         var query = metricPointRepository.GetAll(m =>
             m.ServiceId == service.Id &&
@@ -94,7 +94,7 @@ public class MetricsService(
 
         return query
             .OrderBy(m => m.Timestamp)
-            .Select(e => new MetricPoint
+            .Select(e => new MetricPointDTO
             {
                 Id = e.Id,
                 ServiceName = serviceName,
@@ -308,7 +308,7 @@ public class MetricsService(
         }
     }
 
-    private static void UpdateServiceStatus(int serviceId, string serviceName, MetricPoint metric, bool hasAnomaly)
+    private static void UpdateServiceStatus(int serviceId, string serviceName, MetricPointDTO metric, bool hasAnomaly)
     {
         lock (ServiceStatusLock)
         {

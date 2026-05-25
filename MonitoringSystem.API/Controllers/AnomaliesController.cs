@@ -10,7 +10,7 @@ namespace MonitoringSystem.Controllers;
 public class AnomaliesController(IMetricsService metricsService) : ControllerBase
 {
     private ApiKeyEntity CurrentApiKey =>
-        (ApiKeyEntity)HttpContext.Items["ApiKey"]!;
+        (ApiKeyEntity)HttpContext.Items["ApiKeyDTO"]!;
 
     /// <summary>
     /// Останні аномалії по сервісах поточного API ключа.
