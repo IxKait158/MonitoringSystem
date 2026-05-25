@@ -111,6 +111,74 @@ public class MetricsService(
         }).ToList();
     }
 
+    public async Task<SrCnnBatchAnalysisResponse> AnalyzeSrCnnBatchAsync(SrCnnBatchAnalysisRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ServiceName))
+            throw new Exception("Ім'я сервісу обов'язкове");
+
+        if (string.IsNullOrWhiteSpace(request.MetricName))
+            throw new Exception("Ім'я метрики обов'язкове");
+
+        if (request.From.HasValue && request.To.HasValue && request.From > request.To)
+            throw new Exception("Дата від має бути раніше, ніж дата до");
+
+        var sensitivity = request.Sensitivity ?? 0.3;
+        if (sensitivity is < 0.0 or > 1.0)
+            throw new Exception("Чутливість має бути в діапазоні [0.0, 1.0]");
+
+        var from = request.From ?? DateTime.UtcNow.AddDays(-1);
+        var to = request.To ?? DateTime.UtcNow;
+
+        var metrics = await GetMetricsAsync(request.ServiceName, request.MetricName, from, to);
+
+        var timeSeries = metrics
+            .OrderBy(x => x.Timestamp)
+            .Select(x => (x.Timestamp, x.Value))
+            .ToList();
+
+        if (timeSeries.Count < 12)
+            throw new Exception(
+                $"Недостатньо даних для SrCnn-аналізу (потрібно ≥ 12 точок, знайдено {timeSeries.Count}). Розширте часовий діапазон.");
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var detections = anomalyDetectionService.AnalyzeBatchWithMlNet(
+            request.ServiceName, request.MetricName, timeSeries, sensitivity);
+        stopwatch.Stop();
+
+        var points = detections.Select(d => new SrCnnBatchPoint
+        {
+            Timestamp = d.DetectedAt,
+            Value = d.Value,
+            AnomalyScore = d.AnomalyScore,
+            IsAnomaly = d.IsAnomaly,
+            Severity = d.Severity
+        }).ToList();
+
+        var anomalies = points
+            .Where(p => p.IsAnomaly)
+            .OrderByDescending(p => p.AnomalyScore)
+            .ToList();
+
+        return new SrCnnBatchAnalysisResponse
+        {
+            ServiceName = request.ServiceName,
+            MetricName = request.MetricName,
+            From = from,
+            To = to,
+            Sensitivity = sensitivity,
+            TotalPoints = points.Count,
+            AnomalyCount = anomalies.Count,
+            CriticalCount = anomalies.Count(a => a.Severity == "Critical"),
+            WarningCount = anomalies.Count(a => a.Severity == "Warning"),
+            InfoCount = anomalies.Count(a => a.Severity == "Info"),
+            AverageScore = points.Count == 0 ? 0 : points.Average(p => p.AnomalyScore),
+            MaxScore = points.Count == 0 ? 0 : points.Max(p => p.AnomalyScore),
+            ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+            Points = points,
+            Anomalies = anomalies
+        };
+    }
+
     public async Task<AnomalyAlgorithmComparisonResponse> CompareAnomalyAlgorithmsAsync(
         AnomalyAlgorithmComparisonRequest request)
     {

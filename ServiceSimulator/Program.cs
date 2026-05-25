@@ -1,6 +1,6 @@
 ﻿using System.Net.Http.Json;
 
-var apiUrl = Environment.GetEnvironmentVariable("MONITORING_API_URL") ?? "http://localhost:5169";
+const string apiUrl =  "http://localhost:5169";
 
 var clients = new Dictionary<string, HttpClient>
 {

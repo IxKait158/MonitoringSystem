@@ -17,6 +17,8 @@ public interface IMetricsService
     Task<AnomalyAlgorithmComparisonResponse> CompareAnomalyAlgorithmsAsync(
         AnomalyAlgorithmComparisonRequest request);
 
+    Task<SrCnnBatchAnalysisResponse> AnalyzeSrCnnBatchAsync(SrCnnBatchAnalysisRequest request);
+
     List<ServiceStatus> GetServiceStatuses();
 
     Task RefreshServiceHealthAsync(TimeSpan timeout);

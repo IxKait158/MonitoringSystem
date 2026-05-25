@@ -1,8 +1,8 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using MonitoringSystem.BLL.Interfaces.Entities;
 using MonitoringSystem.BLL.Interfaces.Repositories;
 using MonitoringSystem.DAL.Data;
-using MonitoringSystem.Domain.Interfaces;
 
 namespace MonitoringSystem.DAL.Repositories;
 

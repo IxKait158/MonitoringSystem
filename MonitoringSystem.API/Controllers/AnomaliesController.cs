@@ -49,4 +49,25 @@ public class AnomaliesController(IMetricsService metricsService) : ControllerBas
             });
         }
     }
+
+    /// <summary>
+    /// Пакетний SrCnn-аналіз архівних метричних даних (Spectral Residual + CNN).
+    /// POST /api/anomalies/srcnn-batch
+    /// </summary>
+    [HttpPost("srcnn-batch")]
+    public async Task<IActionResult> SrCnnBatch([FromBody] SrCnnBatchAnalysisRequest request)
+    {
+        try
+        {
+            var result = await metricsService.AnalyzeSrCnnBatchAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
+    }
 }

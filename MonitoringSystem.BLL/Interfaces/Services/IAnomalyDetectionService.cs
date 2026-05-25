@@ -14,5 +14,5 @@ public interface IAnomalyDetectionService
         List<(DateTime Timestamp, double Value)> timeSeries);
 
     List<AnomalyResult> AnalyzeBatchWithMlNet(string serviceName, string metricName,
-        List<(DateTime Timestamp, double Value)> timeSeries);
+        List<(DateTime Timestamp, double Value)> timeSeries, double threshold = 0.3);
 }

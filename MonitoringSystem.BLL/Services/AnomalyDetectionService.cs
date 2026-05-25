@@ -140,14 +140,15 @@ public class AnomalyDetectionService(
     /// </summary>
     public List<AnomalyResult> AnalyzeBatchWithMlNet(
         string serviceName, string metricName,
-        List<(DateTime Timestamp, double Value)> timeSeries)
+        List<(DateTime Timestamp, double Value)> timeSeries,
+        double threshold = 0.3)
     {
-        if (timeSeries.Count < 12) 
+        if (timeSeries.Count < 12)
             return new List<AnomalyResult>();
-        
+
         var data = timeSeries.Select(x => new TimeSeriesInput { Value = (float)x.Value }).ToList();
         var dataView = mlContext.Data.LoadFromEnumerable(data);
-        
+
         // SrCnn — Spectral Residual + CNN для виявлення аномалій
         var pipeline = mlContext.Transforms.DetectAnomalyBySrCnn(
             outputColumnName: "Prediction",
@@ -157,7 +158,7 @@ public class AnomalyDetectionService(
             lookaheadWindowSize: 5,
             averagingWindowSize: 3,
             judgementWindowSize: Math.Min(21, timeSeries.Count),
-            threshold: 0.3);
+            threshold: threshold);
 
         var model = pipeline.Fit(dataView);
         var predictions = model.Transform(dataView);

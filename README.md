@@ -1,222 +1,131 @@
 # MonitoringSystem
 
-Розподілена система моніторингу мікросервісів з автоматичним виявленням аномалій.
+Розподілена система моніторингу мікросервісів з автоматичним виявленням аномалій. Дипломний проєкт.
 
-Проєкт демонструє повний цикл моніторингу: мікросервіси або симулятор надсилають метрики в API, API зберігає їх у PostgreSQL, виконує виявлення аномалій, підтримує health-status інстансів сервісів і передає оновлення на dashboard через SignalR.
+Мікросервіси (або симулятор) надсилають метрики в API, API зберігає їх у PostgreSQL, виконує real-time виявлення аномалій (Z-score) і пакетний аналіз архіву (ML.NET SrCnn), стежить за health-статусом інстансів і передає оновлення на dashboard через SignalR.
 
 ## Склад рішення
 
-Рішення `MonitoringSystem.sln` складається з трьох основних проєктів:
+`MonitoringSystem.sln` побудовано за принципом чистої архітектури з розділенням на шари:
 
-| Проєкт | Призначення |
-| --- | --- |
-| `MonitoringSystem.API` | Основний backend: прийом метрик, збереження в БД, anomaly detection, health-check, SignalR, dashboard static files |
-| `MonitoringSystem.Shared` | Спільні DTO/моделі: метрики, запити ingestion, статуси сервісів, результати аномалій |
-| `ServiceSimulator` | Консольний симулятор мікросервісів, який генерує нормальні метрики та штучні аномалії |
+| Проєкт | Шар | Призначення |
+|---|---|---|
+| `MonitoringSystem.API` | Presentation | ASP.NET Core Web API + статичний dashboard. Контролери, middleware, SignalR-hub, `Program.cs` |
+| `MonitoringSystem.BLL` | Business Logic | Сервіси, інтерфейси, доменні моделі, DI-реєстрація, anomaly detection, SignalR-hub, фонові служби |
+| `MonitoringSystem.DAL` | Data Access | EF Core `DbContext`, репозиторії, міграції PostgreSQL |
+| `MonitoringSystem.Domain` | Domain | Entity-класи та інтерфейси доменного рівня |
+| `ServiceSimulator` | Tool | Консольний симулятор, який генерує метрики й штучні аномалії |
 
 ## Архітектура
 
-Загальний потік даних:
-
 ```text
 ServiceSimulator / Microservice
-        |
-        | POST /api/metrics/ingest
-        v
-MonitoringSystem.API
-        |
-        | збереження MetricPointEntity
-        | аналіз AnomalyDetectionService
-        | оновлення ServiceStatus
-        v
-PostgreSQL
-        |
-        v
-SignalR Hub /hub/metrics
-        |
-        v
-Dashboard
+        │
+        │ POST /api/metrics/ingest  (X-API-KEY: ...)
+        ▼
+┌──────────────────────────────────────┐
+│  MonitoringSystem.API                │
+│  ┌────────────────────────────────┐  │
+│  │ ApiKeyMiddleware (auth)        │  │
+│  │ MetricsCollectionMiddleware    │  │
+│  └────────────────────────────────┘  │
+│  ┌────────────────────────────────┐  │
+│  │ Controllers                    │  │
+│  │  • Metrics                     │  │
+│  │  • Anomalies                   │  │
+│  │  • ApiKeys                     │  │
+│  └────────────────────────────────┘  │
+└──────────────┬───────────────────────┘
+               │
+               ▼
+┌──────────────────────────────────────┐
+│  MonitoringSystem.BLL                │
+│  • MetricsService                    │
+│  • AnomalyDetectionService           │
+│      ├ Z-score (online)              │
+│      └ ML.NET SrCnn (batch)          │
+│  • ApiKeysService                    │
+│  • MetricIngestionBackgroundService  │
+│  • ServiceHealthBackgroundService    │
+│  • MetricsHub  (SignalR)             │
+└──────────────┬───────────────────────┘
+               │
+               ▼
+┌──────────────────────────────────────┐
+│  MonitoringSystem.DAL / Domain       │
+│  EF Core + PostgreSQL                │
+│  • MetricPointEntity                 │
+│  • AnomalyEntity                     │
+│  • ApiKeyEntity                      │
+└──────────────────────────────────────┘
+               │
+               ▼ SignalR /hub/metrics
+        ┌────────────┐
+        │ Dashboard  │
+        └────────────┘
 ```
 
-Окремо middleware самого API збирає внутрішні HTTP-метрики API: час відповіді, кількість запитів, помилки та використання пам'яті. Ці метрики не записуються напряму під час HTTP-запиту, а потрапляють у background queue.
+## Ключові компоненти
 
-## Основні компоненти API
+### Authentication — API ключі
 
-### `MetricsController`
+`MonitoringSystem.API/Middlewares/ApiKeyMiddleware.cs`
 
-Файл: `MonitoringSystem.API/Controllers/MetricsController.cs`
+Всі endpoint-и, окрім публічних (`/health`, `/swagger`, `/hub/metrics`, `/api/keys`), вимагають заголовок:
 
-Відповідає за HTTP API для роботи з метриками:
+```http
+X-API-KEY: <key>
+```
 
-- `POST /api/metrics/ingest` - приймає метрики від зовнішніх сервісів або симулятора.
-- `GET /api/metrics` - повертає історію метрик за сервісом, інстансом, назвою метрики та часовим діапазоном.
-- `GET /api/metrics/services` - повертає поточний статус усіх відомих інстансів сервісів.
+Ключ перевіряється на існування й активність у БД, поле `LastUsedAt` оновлюється при кожному запиті. Контролер `ApiKeysController` дозволяє створювати, переглядати та відкликати ключі.
 
 ### `MetricsService`
 
-Файл: `MonitoringSystem.API/Services/MetricsService.cs`
+`MonitoringSystem.BLL/Services/MetricsService.cs`
 
-Центральний сервіс обробки метрик:
+Центральний сервіс. Зберігає метрики, виконує online-аналіз Z-score, зберігає виявлені аномалії, оновлює in-memory кеш статусів сервісів, надсилає події через SignalR (`MetricsUpdated`, `AnomaliesDetected`, `ServiceStatusUpdated`). Також відповідає за пакетне порівняння алгоритмів і за новий пакетний SrCnn-аналіз.
 
-- зберігає метрики в PostgreSQL;
-- запускає аналіз аномалій;
-- зберігає знайдені аномалії;
-- оновлює in-memory статус сервісів;
-- надсилає події на dashboard через SignalR.
+### `AnomalyDetectionService`
 
-Це важливо для розподіленої системи, бо один мікросервіс може мати кілька інстансів.
+`MonitoringSystem.BLL/Services/AnomalyDetectionService.cs`
 
-### `MetricIngestionQueue`
+Дві стратегії виявлення:
 
-Файли:
+| Метод | Алгоритм | Сценарій |
+|---|---|---|
+| `Analyze(MetricPoint)` | **Z-score** з ковзним вікном 30 точок, поріг 2.5σ | online-аналіз під час ingest |
+| `AnalyzeBatchWithMlNet(...)` | **ML.NET SrCnn** (Spectral Residual + CNN, KDD 2019) | пакетний аналіз архіву, чутливість 0.1–0.9 |
+| `CompareAlgorithms(...)` | обидва на одному часовому ряді | порівняння точності |
 
-- `MonitoringSystem.API/Services/MetricIngestionQueue.cs`
-- `MonitoringSystem.API/Services/MetricIngestionBackgroundService.cs`
+Поріг SrCnn передається параметром і конфігурується з UI.
 
-Це background queue для метрик, які збирає middleware самого API.
+### Background-сервіси
 
-Middleware не викликає `MetricsService.IngestAsync` напряму, бо `MetricsService` використовує scoped-залежності, зокрема `DbContext`. Замість цього middleware кладе `MetricIngestionRequest` у чергу, а `MetricIngestionBackgroundService` обробляє його в окремому DI scope.
-
-Це зменшує зв'язність між HTTP request pipeline і записом метрик у БД.
+- **`MetricIngestionBackgroundService`** + **`MetricIngestionQueue`** — middleware кладе власні метрики API в чергу, фоновий сервіс читає їх в окремому DI scope (бо `DbContext` — scoped).
+- **`ServiceHealthBackgroundService`** — періодично перевіряє, чи присилав інстанс метрики останніх `TimeoutSeconds` секунд; перемикає `IsHealthy` і шле оновлення в SignalR.
 
 ### `MetricsCollectionMiddleware`
 
-Файл: `MonitoringSystem.API/Middlewares/MetricsCollectionMiddleware.cs`
+`MonitoringSystem.API/Middlewares/MetricsCollectionMiddleware.cs`
 
-Збирає технічні метрики самого API:
+API сам себе моніторить. Збирає на кожному HTTP-запиті:
 
 - `http.response_time_ms`
 - `system.memory_mb`
 - `http.requests_total`
 - `http.errors_total`
 
-Якщо змінна не задана, використовується `Environment.MachineName`.
+### `MetricsHub` (SignalR)
 
-### `ServiceHealthBackgroundService`
+`MonitoringSystem.BLL/Hubs/MetricsHub.cs` → endpoint `/hub/metrics`
 
-Файли:
-
-- `MonitoringSystem.API/Services/ServiceHealthBackgroundService.cs`
-- `MonitoringSystem.API/Services/ServiceHealthOptions.cs`
-
-Фоновий сервіс, який періодично перевіряє, чи давно інстанс сервісу надсилав метрики.
-
-Налаштування в `MonitoringSystem.API/appsettings.json`:
-
-```json
-{
-  "ServiceHealth": {
-    "TimeoutSeconds": 30,
-    "CheckIntervalSeconds": 5
-  }
-}
-```
-
-Логіка:
-
-- якщо інстанс надсилав метрики протягом останніх `TimeoutSeconds`, він `Healthy`;
-- якщо метрик давно не було, він стає `Unhealthy`;
-- dashboard отримує оновлення через SignalR.
-
-### `AnomalyDetectionService`
-
-Файл: `MonitoringSystem.API/Services/AnomalyDetectionService.cs`
-
-Виявляє аномалії у метриках.
-
-Зараз реалізовано:
-
-- онлайн-аналіз через Z-score;
-- пакетний аналіз історичного часового ряду через ML.NET SrCnn.
-
-Це дозволяє не змішувати метрики різних інстансів одного сервісу.
-
-### `MetricsHub`
-
-Файл: `MonitoringSystem.API/Hubs/MetricsHub.cs`
-
-SignalR hub для real-time оновлень dashboard.
-
-Endpoint:
-
-```text
-/hub/metrics
-```
-
-Події, які отримує dashboard:
-
-- `MetricsUpdated`
-- `AnomaliesDetected`
-- `ServiceStatusUpdated`
-
-## Моделі даних
-
-### `MetricIngestionRequest`
-
-Запит на прийом метрик:
-
-```json
-{
-  "serviceName": "PaymentService",
-  "metrics": []
-}
-```
-
-### `MetricPoint`
-
-Одна точка метрики:
-
-```json
-{
-  "serviceName": "PaymentService",
-  "metricName": "http.response_time_ms",
-  "value": 123.4,
-  "timestamp": "2026-05-24T12:00:00Z",
-  "tags": {
-    "method": "GET",
-    "path": "/api/orders"
-  }
-}
-```
-
-### `ServiceStatus`
-
-Поточний стан інстанса сервісу:
-
-```json
-{
-  "serviceName": "PaymentService",
-  "isHealthy": true,
-  "lastSeen": "2026-05-24T12:00:00Z",
-  "anomalyCount": 2,
-  "latestMetrics": {
-    "system.cpu_percent": 42.5,
-    "http.response_time_ms": 85.0
-  }
-}
-```
-
-### `AnomalyResult`
-
-Результат виявлення аномалії:
-
-```json
-{
-  "serviceName": "PaymentService",
-  "metricName": "http.response_time_ms",
-  "value": 2500.0,
-  "expectedValue": 70.0,
-  "anomalyScore": 1.0,
-  "isAnomaly": true,
-  "severity": "Critical"
-}
-```
+Події: `MetricsUpdated`, `AnomaliesDetected`, `ServiceStatusUpdated`.
 
 ## База даних
 
-Використовується PostgreSQL через Entity Framework Core.
+PostgreSQL через Entity Framework Core. Міграції живуть у `MonitoringSystem.DAL/Data/Migrations` і застосовуються автоматично при старті API (`app.ApplyMigrations()`).
 
-Connection string знаходиться в `MonitoringSystem.API/appsettings.json`:
+Connection string у `MonitoringSystem.API/appsettings.json`:
 
 ```json
 {
@@ -226,190 +135,134 @@ Connection string знаходиться в `MonitoringSystem.API/appsettings.js
 }
 ```
 
-Основні таблиці:
+Таблиці:
 
-- `MetricPoints` - історія метрик;
-- `Anomalies` - знайдені аномалії.
+- `MetricPoints` — історія метрик (індекси за `ServiceName`, `MetricName`, `Timestamp`)
+- `Anomalies` — виявлені аномалії (індекс за `DetectedAt`)
+- `ApiKeys` — згенеровані ключі для сервісів
 
-Індекси оптимізовані під пошук за:
-
-- `ServiceName`
-- `MetricName`
-- `Timestamp`
-- `DetectedAt`
-
-Після зміни моделей потрібно створити та застосувати EF Core migration:
+Створити міграцію після зміни моделей:
 
 ```powershell
-dotnet ef migrations add AddServiceHealth -p MonitoringSystem.API
-dotnet ef database update -p MonitoringSystem.API
+dotnet ef migrations add <Name> -p MonitoringSystem.DAL -s MonitoringSystem.API
 ```
 
 ## Dashboard
 
+Single-page UI у `MonitoringSystem.API/wwwroot/`. П'ять сторінок-вкладок:
+
+| Сторінка | Що показує |
+|---|---|
+| **Дашборд** | Real-time картки сервісів, графіки CPU/Memory, потік аномалій через SignalR |
+| **Метрики** | Статус інстансів + пошук метрик за діапазоном з графіком та таблицею |
+| **Аномалії** | Архів виявлених аномалій з фільтрами за сервісом і часом |
+| **Алгоритми** | Side-by-side порівняння Z-score та SrCnn (precision, recall, F1, час) |
+| **SrCnn архів** | **Новий.** Пакетний SrCnn-аналіз архівних даних — див. нижче |
+| **API Ключі** | Створення, перегляд, відкликання ключів |
+
 Файли:
 
-- `MonitoringSystem.API/wwwroot/dashboard/index.html`
-- `MonitoringSystem.API/wwwroot/js/script.js`
-- `MonitoringSystem.API/wwwroot/styles/main.css`
+- `wwwroot/index.html` — розмітка
+- `wwwroot/css/main.css` — стилі (тема, аналогічна Grafana dark)
+- `wwwroot/js/config.js` — `apiFetch`, `toast`, форматтери, навігація
+- `wwwroot/js/page-metrics.js`, `page-anomalies.js`, `page-srcnn.js`, `page-keys.js` — логіка вкладок
+- `wwwroot/js/signalr-handler.js` — підписка на події hub-а
 
-Dashboard показує:
+`API_URL` у `wwwroot/js/config.js` за замовчуванням — `http://localhost:5169`.
 
-- картки сервісів та інстансів;
-- останні значення CPU, memory, response time;
-- health status інстанса;
-- кількість аномалій;
-- графіки response time та memory;
-- список останніх аномалій.
+API-ключ для запитів зберігається в `localStorage` і додається в кожен fetch як `X-API-KEY`. Поле для введення ключа є в шапці dashboard-а.
 
-Dashboard підключається до SignalR:
+### SrCnn архівний аналіз
 
-```js
-const API_URL = 'http://localhost:5000';
-```
+Окрема вкладка для пакетного аналізу історичних метрик алгоритмом SrCnn. Дозволяє:
 
-Якщо API запускається не на `5000`, потрібно змінити `API_URL` у `MonitoringSystem.API/wwwroot/js/script.js`.
+- обрати сервіс, метрику та довільний часовий діапазон;
+- регулювати **чутливість 0.1–0.9** через slider (поріг SrCnn);
+- отримати графік ряду з виділеними червоними точками аномалій;
+- окремий bar-chart `Anomaly Score за часом`, кольори за severity;
+- 8 статистичних карток: всього точок / аномалій (з %) / Critical / Warning / Info / max score / avg score / час обробки;
+- таблицю аномалій з progress-bar score та badge severity;
+- **експорт у CSV**.
 
-## ServiceSimulator
-
-Файл: `ServiceSimulator/Program.cs`
-
-Симулятор генерує метрики для сервісів:
-
-- `OrderService`
-- `PaymentService`
-- `UserService`
-
-Кожні 50 ітерацій для `PaymentService` створюється штучна аномалія:
-
-- високий CPU;
-- великий response time.
-
-Симулятор використовує:
-
-```text
-MONITORING_API_URL
-```
-
-Якщо `MONITORING_API_URL` не заданий, використовується:
-
-```text
-http://localhost:5000
-```
-
-Приклад запуску з явним URL:
-
-```powershell
-$env:MONITORING_API_URL="http://localhost:5169"
-dotnet run --project ServiceSimulator
-```
+Мінімум для SrCnn — 12 точок у вибраному діапазоні.
 
 ## Запуск
 
-### 1. Підготувати PostgreSQL
-
-Створити базу даних:
+### 1. PostgreSQL
 
 ```sql
 CREATE DATABASE monitoring_db;
 ```
 
-Перевірити connection string у:
+Перевірити `ConnectionStrings:DefaultConnection` в `MonitoringSystem.API/appsettings.json`.
 
-```text
-MonitoringSystem.API/appsettings.json
-```
-
-### 2. Застосувати міграції
-
-```powershell
-dotnet ef database update -p MonitoringSystem.API
-```
-
-Якщо міграцій ще немає після останніх змін:
-
-```powershell
-dotnet ef migrations add AddServiceHealth -p MonitoringSystem.API
-dotnet ef database update -p MonitoringSystem.API
-```
-
-### 3. Запустити API
-
-Варіант 1: стандартний launch profile:
+### 2. Запустити API
 
 ```powershell
 dotnet run --project MonitoringSystem.API
 ```
 
-За `launchSettings.json` API може стартувати на:
+Міграції застосуються автоматично. URL — `http://localhost:5169` (див. `Properties/launchSettings.json`).
 
-```text
-http://localhost:5169
-https://localhost:7246
-```
-
-Варіант 2: запуск на `5000`, щоб збігалося з dashboard і simulator:
+Якщо потрібно інший порт — або змінити profile, або:
 
 ```powershell
 $env:ASPNETCORE_URLS="http://localhost:5000"
 dotnet run --project MonitoringSystem.API
 ```
 
+Тоді `API_URL` у `wwwroot/js/config.js` теж треба підправити.
+
+### 3. Створити API-ключ
+
+Через Swagger (`/swagger`) або з UI (вкладка **API Ключі**):
+
+```http
+POST /api/keys
+Content-Type: application/json
+
+{ "serviceName": "PaymentService", "ownerName": "backend-team" }
+```
+
+У відповіді — ключ. Зберігай — він показується тільки раз.
+
 ### 4. Відкрити dashboard
 
-Якщо API запущений на `5000`:
-
 ```text
-http://localhost:5000/dashboard/index.html
+http://localhost:5169/
 ```
 
-Якщо API запущений на `5169`:
-
-```text
-http://localhost:5169/dashboard/index.html
-```
-
-У цьому випадку також потрібно змінити `API_URL` у `MonitoringSystem.API/wwwroot/js/script.js` на `http://localhost:5169`.
+Вставити отриманий ключ у поле `X-API-KEY` у шапці → зберегти.
 
 ### 5. Запустити симулятор
 
-Якщо API на `5000`:
+Симулятор використовує hardcoded ключі (`mk_dev_*`) для `OrderService`, `PaymentService`, `UserService`. Перед запуском треба створити ці ключі через `POST /api/keys` або підправити ключі в `ServiceSimulator/Program.cs`.
 
 ```powershell
 dotnet run --project ServiceSimulator
 ```
 
-Якщо API на `5169`:
+Кожні 2 секунди надсилає метрики `system.cpu_percent`, `system.memory_mb`, `http.response_time_ms`, `http.requests_per_second`. Кожні 50 ітерацій — штучна аномалія для `PaymentService` (CPU 95–100%, response 2–3s).
 
-```powershell
-$env:MONITORING_API_URL="http://localhost:5169"
-dotnet run --project ServiceSimulator
-```
+## Endpoints
 
-## Основні endpoints
+Всі endpoint-и (крім публічних) вимагають `X-API-KEY`. Повна специфікація — Swagger UI на `/swagger`.
 
-### Health API
+### Health
 
 ```http
 GET /health
 ```
 
-Відповідь:
-
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-05-24T12:00:00Z"
-}
-```
-
-### Прийом метрик
+### Метрики
 
 ```http
 POST /api/metrics/ingest
+GET  /api/metrics?service=...&metric=...&from=...&to=...
+GET  /api/metrics/services
 ```
 
-Приклад body:
+Приклад ingestion:
 
 ```json
 {
@@ -418,87 +271,141 @@ POST /api/metrics/ingest
     {
       "metricName": "http.response_time_ms",
       "value": 2500,
-      "timestamp": "2026-05-24T12:00:00Z",
-      "tags": {
-        "endpoint": "/api/payments"
-      }
+      "timestamp": "2026-05-25T12:00:00Z",
+      "tags": { "endpoint": "/api/payments" }
     }
   ]
 }
 ```
 
-### Отримати історію метрик
+### Аномалії
 
 ```http
-GET /api/metrics?service=PaymentService&metric=http.response_time_ms&from=2026-05-24T11:00:00Z&to=2026-05-24T12:00:00Z
-```
-
-### Отримати статуси сервісів
-
-```http
-GET /api/metrics/services
-```
-
-### Отримати останні аномалії
-
-```http
-GET /api/anomalies?count=20
-```
-
-## Логування
-
-Використовується Serilog.
-
-Логи пишуться:
-
-- у консоль;
-- у файли `MonitoringSystem.API/logs/monitoring-*.log`.
-
-## Що вже відповідає темі диплому
-
-У системі вже реалізовано:
-
-- збір метрик від кількох сервісів;
-- збереження історії метрик;
-- real-time dashboard;
-- health-check інстансів сервісів;
-- автоматичне виявлення аномалій;
-- класифікація severity через anomaly score;
-- симуляція нормальної поведінки та штучних аномалій.
-
-## Ідеї для подальшого розвитку
-
-Корисні наступні кроки:
-
-- додати endpoint для порівняння алгоритмів anomaly detection;
-- реалізувати додаткові алгоритми: moving average, EWMA, MAD;
-- додати Docker Compose для API, PostgreSQL, simulator і dashboard;
-- додати OpenTelemetry traces;
-- зробити авторизацію для API ingestion;
-- додати retention policy для старих метрик;
-- додати unit/integration tests для anomaly detection і health-check логіки.
-## Anomaly algorithm comparison endpoint
-
-The API exposes a comparison endpoint for historical metric data:
-
-```http
+GET  /api/anomalies?count=20
 POST /api/anomalies/compare
+POST /api/anomalies/srcnn-batch
 ```
 
-Example request:
+**`/compare`** — порівнює Z-score і SrCnn на одному ряді:
 
 ```json
 {
   "serviceName": "PaymentService",
   "metricName": "http.response_time_ms",
-  "from": "2026-05-24T11:00:00Z",
-  "to": "2026-05-24T12:00:00Z"
+  "from": "2026-05-25T11:00:00Z",
+  "to": "2026-05-25T12:00:00Z"
 }
 ```
 
-The response includes total points and per-algorithm results for:
+**`/srcnn-batch`** — пакетний SrCnn-аналіз з регульованою чутливістю:
 
-- `Z-score`
-- `Moving average`
-- `EWMA`
-- `ML.NET SrCnn`, when there are enough points for the ML.NET time-series algorithm
+```json
+{
+  "serviceName": "PaymentService",
+  "metricName": "http.response_time_ms",
+  "from": "2026-05-25T00:00:00Z",
+  "to": "2026-05-25T23:59:59Z",
+  "sensitivity": 0.3
+}
+```
+
+Відповідь містить повний ряд (`points`), окремо аномалії (`anomalies`), розподіл за severity, `processingTimeMs`.
+
+### API ключі
+
+```http
+POST   /api/keys           # створити
+GET    /api/keys           # список (без розкриття)
+DELETE /api/keys/{id}      # відкликати
+```
+
+## Моделі
+
+### `MetricPoint`
+
+```json
+{
+  "serviceName": "PaymentService",
+  "metricName": "http.response_time_ms",
+  "value": 123.4,
+  "timestamp": "2026-05-25T12:00:00Z",
+  "tags": { "method": "GET", "path": "/api/orders" }
+}
+```
+
+### `AnomalyResult`
+
+```json
+{
+  "serviceName": "PaymentService",
+  "metricName": "http.response_time_ms",
+  "value": 2500.0,
+  "expectedValue": 70.0,
+  "anomalyScore": 1.0,
+  "isAnomaly": true,
+  "severity": "Critical",
+  "detectedAt": "2026-05-25T12:00:00Z"
+}
+```
+
+`severity` обчислюється з `anomalyScore`: `> 0.8` → Critical, `> 0.5` → Warning, інакше Info.
+
+### `ServiceStatus`
+
+```json
+{
+  "serviceName": "PaymentService",
+  "isHealthy": true,
+  "lastSeen": "2026-05-25T12:00:00Z",
+  "anomalyCount": 2,
+  "latestMetrics": {
+    "system.cpu_percent": 42.5,
+    "http.response_time_ms": 85.0
+  }
+}
+```
+
+## Конфігурація
+
+`MonitoringSystem.API/appsettings.json`:
+
+```json
+{
+  "ServiceHealth": {
+    "TimeoutSeconds": 30,
+    "CheckIntervalSeconds": 5
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Database=monitoring_db;Username=postgres;Password=1234"
+  }
+}
+```
+
+## Логування
+
+Serilog → консоль + файли `MonitoringSystem.API/logs/monitoring-*.log` (rolling daily).
+
+## Стек
+
+- .NET 10, ASP.NET Core
+- Entity Framework Core + Npgsql (PostgreSQL)
+- ML.NET (`Microsoft.ML.TimeSeries`) — SrCnn
+- SignalR — real-time
+- Serilog — логування
+- Swagger / Swashbuckle
+- Chart.js — графіки на dashboard
+
+## Що реалізовано згідно з темою диплому
+
+- збір метрик від кількох розподілених сервісів через REST API;
+- автентифікація сервісів через API ключі;
+- збереження історії метрик і виявлених аномалій у PostgreSQL;
+- real-time dashboard через SignalR;
+- health-check інстансів через timeout-based фоновий сервіс;
+- **два алгоритми виявлення аномалій**:
+  - online Z-score для потокового аналізу,
+  - batch ML.NET SrCnn для архівного аналізу;
+- порівняння алгоритмів на одних даних з метриками точності;
+- класифікація severity через `anomalyScore`;
+- симуляція нормальної поведінки та штучних аномалій;
+- self-monitoring API через middleware + background queue.
