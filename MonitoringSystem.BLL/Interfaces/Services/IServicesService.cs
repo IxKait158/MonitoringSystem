@@ -5,9 +5,9 @@ namespace MonitoringSystem.BLL.Interfaces.Services;
 
 public interface IServicesService
 {
-    Task<Service> CreateAsync(ApiKeyEntity apiKey, CreateServiceRequest request);
+    Task<ServiceDTO> CreateAsync(ApiKeyEntity apiKey, CreateServiceRequest request);
 
-    Task<List<Service>> GetAllAsync(ApiKeyEntity apiKey);
+    Task<List<ServiceDTO>> GetAllAsync(ApiKeyEntity apiKey);
 
     Task DeleteAsync(ApiKeyEntity apiKey, int id);
 

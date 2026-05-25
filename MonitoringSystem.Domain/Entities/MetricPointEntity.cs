@@ -1,4 +1,4 @@
-﻿using MonitoringSystem.BLL.Interfaces.Entities;
+using MonitoringSystem.BLL.Interfaces.Entities;
 
 namespace MonitoringSystem.Domain.Entities;
 
@@ -9,7 +9,7 @@ public class MetricPointEntity : IEntity
     public double Value { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public Dictionary<string, string> Tags { get; set; } = new();
-    
+
     public int ServiceId { get; set; }
-    public ServiceEntity Service { get; set; } = new();
+    public ServiceEntity? Service { get; set; }
 }

@@ -1,4 +1,4 @@
-﻿using MonitoringSystem.BLL.Interfaces.Entities;
+using MonitoringSystem.BLL.Interfaces.Entities;
 
 namespace MonitoringSystem.Domain.Entities;
 
@@ -11,7 +11,7 @@ public class AnomalyEntity : IEntity
     public double AnomalyScore { get; set; }
     public bool IsAnomaly { get; set; }
     public DateTime DetectedAt { get; set; } = DateTime.UtcNow;
-    
+
     public int ServiceId { get; set; }
-    public ServiceEntity Service { get; set; } = new();
+    public ServiceEntity? Service { get; set; }
 }

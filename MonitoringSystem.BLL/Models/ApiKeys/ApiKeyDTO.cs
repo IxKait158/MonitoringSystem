@@ -1,6 +1,6 @@
 namespace MonitoringSystem.BLL.Models.ApiKeys;
 
-public class ApiKey
+public class ApiKeyDTO
 {
     public int Id { get; set; }
     public string Key { get; set; } = string.Empty;

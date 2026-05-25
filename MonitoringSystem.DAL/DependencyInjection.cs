@@ -33,9 +33,7 @@ public static class DependencyInjection
         {
             await using var context = scope.ServiceProvider.GetRequiredService<MonitoringDbContext>();
             await context.Database.MigrateAsync();
-
-            if (!await context.ApiKeys.AnyAsync())
-                await SeedAsync(context);
+            await SeedAsync(context);
         }
         catch (Exception ex)
         {
@@ -46,22 +44,39 @@ public static class DependencyInjection
 
     private static async Task SeedAsync(MonitoringDbContext context)
     {
-        // Демо-користувач: один ключ + три зареєстровані сервіси під ним.
-        var devKey = new ApiKeyEntity
-        {
-            Key = "mk_dev_demo_user_key_0000000000000001",
-            Owner = "dev-team",
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            Services = new List<ServiceEntity>
-            {
-                new() { Name = "OrderService" },
-                new() { Name = "PaymentService" },
-                new() { Name = "UserService" }
-            }
-        };
+        const string devKeyValue = "mk_dev_demo_user_key_0000000000000001";
+        var devServiceNames = new[] { "OrderService", "PaymentService", "UserService" };
 
-        context.ApiKeys.Add(devKey);
-        await context.SaveChangesAsync();
+        // 1. Демо-ключ — створюємо, якщо ще немає.
+        var devKey = await context.ApiKeys.FirstOrDefaultAsync(k => k.Key == devKeyValue);
+        if (devKey == null)
+        {
+            devKey = new ApiKeyEntity
+            {
+                Key = devKeyValue,
+                Owner = "dev-team",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            context.ApiKeys.Add(devKey);
+            await context.SaveChangesAsync();
+        }
+
+        // 2. Три демо-сервіси під цим ключем — додаємо лише ті, яких ще нема.
+        var existingNames = await context.Services
+            .Where(s => s.ApiKeyId == devKey.Id)
+            .Select(s => s.Name)
+            .ToListAsync();
+
+        var missing = devServiceNames
+            .Where(n => !existingNames.Contains(n))
+            .Select(n => new ServiceEntity { Name = n, ApiKeyId = devKey.Id })
+            .ToList();
+
+        if (missing.Count > 0)
+        {
+            context.Services.AddRange(missing);
+            await context.SaveChangesAsync();
+        }
     }
 }

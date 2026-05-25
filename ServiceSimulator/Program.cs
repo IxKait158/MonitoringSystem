@@ -35,10 +35,10 @@ while (true)
             serviceName,
             metrics = new[]
             {
-                new { serviceName, metricName = "system.cpu_percent",       value = cpuBase,          timestamp = DateTime.UtcNow, tags = new Dictionary<string, string>() },
-                new { serviceName, metricName = "system.memory_mb",         value = memBase,          timestamp = DateTime.UtcNow, tags = new Dictionary<string, string>() },
-                new { serviceName, metricName = "http.response_time_ms",    value = responseTimeBase, timestamp = DateTime.UtcNow, tags = new Dictionary<string, string>() },
-                new { serviceName, metricName = "http.requests_per_second", value = (double)random.Next(10, 100), timestamp = DateTime.UtcNow, tags = new Dictionary<string, string>() }
+                new { serviceName, metricName = "system.cpu_percent", value = cpuBase, timestamp = DateTime.UtcNow, tags = new Dictionary<string,string>() },
+                new { serviceName, metricName = "system.memory_mb", value = memBase, timestamp = DateTime.UtcNow, tags = new Dictionary<string,string>() },
+                new { serviceName, metricName = "http.response_time_ms", value = responseTimeBase, timestamp = DateTime.UtcNow, tags = new Dictionary<string,string>() },
+                new { serviceName, metricName = "http.requests_per_second", value = (double)(random.Next(10, 100)), timestamp = DateTime.UtcNow, tags = new Dictionary<string,string>() }
             }
         };
 
@@ -46,7 +46,8 @@ while (true)
         {
             var response = await client.PostAsJsonAsync("/api/metrics/ingest", request);
             if (response.IsSuccessStatusCode)
-                Console.WriteLine($"SUCCESS: [{DateTime.UtcNow:HH:mm:ss}] {serviceName}: CPU={cpuBase:F1}%, Mem={memBase:F0}MB, RT={responseTimeBase:F0}ms");
+                Console.WriteLine(
+                    $"SUCCESS: [{DateTime.UtcNow:HH:mm:ss}] {serviceName}: CPU={cpuBase:F1}%, Mem={memBase:F0}MB, RT={responseTimeBase:F0}ms");
             else
                 Console.WriteLine($"ERROR: Error for {serviceName}: {response.StatusCode}");
         }

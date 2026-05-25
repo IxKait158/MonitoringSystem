@@ -5,7 +5,7 @@ namespace MonitoringSystem.BLL.Interfaces.Services;
 
 public interface IAnomalyDetectionService
 {
-    AnomalyResult Analyze(int serviceId, string serviceName, MetricPoint point);
+    AnomalyResult Analyze(int serviceId, string serviceName, MetricPointDTO pointDto);
 
     List<AnomalyAlgorithmComparisonResult> CompareAlgorithms(
         string serviceName,

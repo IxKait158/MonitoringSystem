@@ -15,7 +15,6 @@ public class MetricsService(
     IAnomalyRepository anomalyRepository,
     IAnomalyDetectionService anomalyDetectionService,
     IServicesRepository servicesRepository,
-    IServicesService servicesService,
     IHubContext<MetricsHub> hubContext) : IMetricsService
 {
     // Ключ: serviceId. Статус живе у пам'яті, відновлюється з потоку метрик.
@@ -28,7 +27,11 @@ public class MetricsService(
             throw new Exception("Ім'я сервісу обов'язкове");
 
         var serviceName = request.ServiceName.Trim();
-        var service = await servicesService.GetOrCreateAsync(apiKey, serviceName);
+        var service = await servicesRepository.FindByApiKeyAndNameAsync(apiKey.Id, serviceName);
+        if (service == null)
+            throw new Exception(
+                $"Сервіс '{serviceName}' не зареєстровано під цим API ключем. " +
+                "Спочатку зареєструйте сервіс з таким ім'ям.");
 
         var anomalies = new List<AnomalyResult>();
 
@@ -75,7 +78,7 @@ public class MetricsService(
             .SendAsync("ServiceStatusUpdated", await GetServiceStatusesAsync(apiKey));
     }
 
-    public async Task<List<MetricPoint>> GetMetricsAsync(
+    public async Task<List<MetricPointDTO>> GetMetricsAsync(
         ApiKeyEntity apiKey,
         string serviceName,
         string metricName,
@@ -84,7 +87,7 @@ public class MetricsService(
     {
         var service = await servicesRepository.FindByApiKeyAndNameAsync(apiKey.Id, serviceName);
         if (service == null)
-            return new List<MetricPoint>();
+            return new List<MetricPointDTO>();
 
         var query = metricPointRepository.GetAll(m =>
             m.ServiceId == service.Id &&
@@ -94,7 +97,7 @@ public class MetricsService(
 
         return query
             .OrderBy(m => m.Timestamp)
-            .Select(e => new MetricPoint
+            .Select(e => new MetricPointDTO
             {
                 Id = e.Id,
                 ServiceName = serviceName,
@@ -308,7 +311,7 @@ public class MetricsService(
         }
     }
 
-    private static void UpdateServiceStatus(int serviceId, string serviceName, MetricPoint metric, bool hasAnomaly)
+    private static void UpdateServiceStatus(int serviceId, string serviceName, MetricPointDTO metric, bool hasAnomaly)
     {
         lock (ServiceStatusLock)
         {

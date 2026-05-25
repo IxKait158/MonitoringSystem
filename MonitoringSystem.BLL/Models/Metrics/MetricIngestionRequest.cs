@@ -3,5 +3,5 @@
 public class MetricIngestionRequest
 {
     public string ServiceName { get; set; } = string.Empty;
-    public List<MetricPoint> Metrics { get; set; } = new();
+    public List<MetricPointDTO> Metrics { get; set; } = new();
 }

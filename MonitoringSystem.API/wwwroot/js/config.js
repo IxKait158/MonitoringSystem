@@ -1,6 +1,6 @@
 // js/config.js — загальна конфігурація та утиліти
 
-const API_URL = "http://localhost:5169/";
+const API_URL = "http://localhost:5169";
 
 // Поточний API ключ — зберігається у localStorage
 function getApiKey() {

@@ -10,7 +10,7 @@ namespace MonitoringSystem.Controllers;
 public class ServicesController(IServicesService servicesService) : ControllerBase
 {
     private ApiKeyEntity CurrentApiKey =>
-        (ApiKeyEntity)HttpContext.Items["ApiKey"]!;
+        (ApiKeyEntity)HttpContext.Items["ApiKeyDTO"]!;
 
     /// <summary>
     /// Зареєструвати новий сервіс під поточним API-ключем

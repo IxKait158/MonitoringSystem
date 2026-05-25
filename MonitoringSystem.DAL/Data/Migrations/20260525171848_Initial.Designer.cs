@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MonitoringSystem.DAL.Data.Migrations
 {
     [DbContext(typeof(MonitoringDbContext))]
-    [Migration("20260524181522_Initial")]
+    [Migration("20260525171848_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -49,16 +49,15 @@ namespace MonitoringSystem.DAL.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ServiceName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("integer");
 
                     b.Property<double>("Value")
                         .HasColumnType("double precision");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ServiceName", "DetectedAt");
+                    b.HasIndex("ServiceId", "DetectedAt");
 
                     b.ToTable("Anomalies");
                 });
@@ -88,10 +87,6 @@ namespace MonitoringSystem.DAL.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ServiceName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Key")
@@ -112,9 +107,8 @@ namespace MonitoringSystem.DAL.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ServiceName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Tags")
                         .IsRequired()
@@ -128,9 +122,77 @@ namespace MonitoringSystem.DAL.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ServiceName", "MetricName", "Timestamp");
+                    b.HasIndex("ServiceId", "MetricName", "Timestamp");
 
                     b.ToTable("MetricPoints");
+                });
+
+            modelBuilder.Entity("MonitoringSystem.Domain.Entities.ServiceEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ApiKeyId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApiKeyId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Services");
+                });
+
+            modelBuilder.Entity("MonitoringSystem.Domain.Entities.AnomalyEntity", b =>
+                {
+                    b.HasOne("MonitoringSystem.Domain.Entities.ServiceEntity", "Service")
+                        .WithMany("Anomalies")
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("MonitoringSystem.Domain.Entities.MetricPointEntity", b =>
+                {
+                    b.HasOne("MonitoringSystem.Domain.Entities.ServiceEntity", "Service")
+                        .WithMany("MetricPoints")
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("MonitoringSystem.Domain.Entities.ServiceEntity", b =>
+                {
+                    b.HasOne("MonitoringSystem.Domain.Entities.ApiKeyEntity", "ApiKey")
+                        .WithMany("Services")
+                        .HasForeignKey("ApiKeyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApiKey");
+                });
+
+            modelBuilder.Entity("MonitoringSystem.Domain.Entities.ApiKeyEntity", b =>
+                {
+                    b.Navigation("Services");
+                });
+
+            modelBuilder.Entity("MonitoringSystem.Domain.Entities.ServiceEntity", b =>
+                {
+                    b.Navigation("Anomalies");
+
+                    b.Navigation("MetricPoints");
                 });
 #pragma warning restore 612, 618
         }

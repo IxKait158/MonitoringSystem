@@ -1,6 +1,6 @@
 ﻿namespace MonitoringSystem.BLL.Models.Metrics;
 
-public class MetricPoint
+public class MetricPointDTO
 {
     public int Id { get; set; }
     public string ServiceName { get; set; } = string.Empty;

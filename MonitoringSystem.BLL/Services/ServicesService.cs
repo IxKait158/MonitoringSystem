@@ -7,7 +7,7 @@ namespace MonitoringSystem.BLL.Services;
 
 public class ServicesService(IServicesRepository servicesRepository) : IServicesService
 {
-    public async Task<Service> CreateAsync(ApiKeyEntity apiKey, CreateServiceRequest request)
+    public async Task<ServiceDTO> CreateAsync(ApiKeyEntity apiKey, CreateServiceRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
             throw new Exception("Ім'я сервісу обов'язкове");
@@ -24,14 +24,15 @@ public class ServicesService(IServicesRepository servicesRepository) : IServices
         };
         await servicesRepository.AddAsync(entity);
 
-        return new Service { Id = entity.Id, Name = entity.Name };
+        return new ServiceDTO { Id = entity.Id, Name = entity.Name };
     }
 
-    public async Task<List<Service>> GetAllAsync(ApiKeyEntity apiKey)
+    public async Task<List<ServiceDTO>> GetAllAsync(ApiKeyEntity apiKey)
     {
         var services = await servicesRepository.GetByApiKeyAsync(apiKey.Id);
+        
         return services
-            .Select(s => new Service { Id = s.Id, Name = s.Name })
+            .Select(s => new ServiceDTO { Id = s.Id, Name = s.Name })
             .ToList();
     }
 
@@ -46,17 +47,18 @@ public class ServicesService(IServicesRepository servicesRepository) : IServices
 
     public async Task<ServiceEntity> GetOrCreateAsync(ApiKeyEntity apiKey, string name)
     {
-        var trimmed = name.Trim();
-        var existing = await servicesRepository.FindByApiKeyAndNameAsync(apiKey.Id, trimmed);
+        var trimmedName = name.Trim();
+        var existing = await servicesRepository.FindByApiKeyAndNameAsync(apiKey.Id, trimmedName);
         if (existing != null)
             return existing;
 
         var entity = new ServiceEntity
         {
-            Name = trimmed,
+            Name = trimmedName,
             ApiKeyId = apiKey.Id
         };
         await servicesRepository.AddAsync(entity);
+        
         return entity;
     }
 }

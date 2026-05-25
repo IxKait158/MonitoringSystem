@@ -1,4 +1,3 @@
-﻿
 using MonitoringSystem.BLL.Interfaces.Entities;
 
 namespace MonitoringSystem.Domain.Entities;
@@ -12,5 +11,5 @@ public class ApiKeyEntity : IEntity
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime LastUsedAt { get; set; }
 
-    public ICollection<ServiceEntity> Services { get; set; }
+    public ICollection<ServiceEntity>? Services { get; set; }
 }
