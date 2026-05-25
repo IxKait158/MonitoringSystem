@@ -74,7 +74,7 @@ namespace MonitoringSystem.DAL.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("Key")
+                    b.Property<string>("ApiKey")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -91,7 +91,7 @@ namespace MonitoringSystem.DAL.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Key")
+                    b.HasIndex("ApiKey")
                         .IsUnique();
 
                     b.ToTable("ApiKeys");

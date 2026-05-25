@@ -1,10 +1,20 @@
-﻿// js/config.js — загальна конфігурація та утиліти
+// js/config.js — загальна конфігурація та утиліти
 
 const API_URL = "http://localhost:5169/";
 
+// Поточний API ключ — зберігається у localStorage
+function getApiKey() {
+    return localStorage.getItem('apiKey') || '';
+}
+
+function setApiKey(value) {
+    if (value) localStorage.setItem('apiKey', value);
+    else localStorage.removeItem('apiKey');
+}
+
 // HTTP помічник
 async function apiFetch(path, options = {}) {
-    const apiKey = localStorage.getItem('apiKey') || '';
+    const apiKey = getApiKey();
     const res = await fetch(`${API_URL}${path}`, {
         headers: {
             'Content-Type': 'application/json',
@@ -87,4 +97,13 @@ function metricClass(name, value) {
         return value > 80 ? 'crit' : value > 50 ? 'warn' : 'ok';
     }
     return 'ok';
+}
+
+// Перевірити, що ключ існує — інакше пропонуємо ввести
+function requireApiKey() {
+    if (!getApiKey()) {
+        toast('Введіть API ключ у верхньому полі та натисніть зберегти', 'error');
+        return false;
+    }
+    return true;
 }

@@ -23,9 +23,9 @@ public class AnomalyDetectionService(
     private const int MinHistorySize = 5;
     private const double ZScoreThreshold = 2.5;
 
-    public AnomalyResult Analyze(MetricPoint point)
+    public AnomalyResult Analyze(int serviceId, string serviceName, MetricPoint point)
     {
-        var key = $"{point.ServiceName}:{point.MetricName}";
+        var key = $"{serviceId}:{point.MetricName}";
         var history = _metricHistory.GetOrAdd(key, _ => new Queue<double>());
         var historyLock = _historyLocks.GetOrAdd(key, _ => new object());
 
@@ -34,7 +34,7 @@ public class AnomalyDetectionService(
             var result = new AnomalyResult
             {
                 MetricPointId = point.Id,
-                ServiceName = point.ServiceName,
+                ServiceName = serviceName,
                 MetricName = point.MetricName,
                 Value = point.Value,
                 DetectedAt = DateTime.UtcNow
@@ -58,7 +58,7 @@ public class AnomalyDetectionService(
                     {
                         logger.LogInformation(
                             "Виявлено аномалію для {ServiceName}:{MetricName}, value={Value}, Z-Score={ZScore:F2}",
-                            point.ServiceName,
+                            serviceName,
                             point.MetricName,
                             result.Value,
                             zScore);

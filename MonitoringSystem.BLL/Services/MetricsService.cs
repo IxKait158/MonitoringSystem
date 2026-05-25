@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
 using MonitoringSystem.BLL.Hubs;
 using MonitoringSystem.BLL.Interfaces.Repositories;
@@ -14,18 +14,23 @@ public class MetricsService(
     IMetricPointRepository metricPointRepository,
     IAnomalyRepository anomalyRepository,
     IAnomalyDetectionService anomalyDetectionService,
+    IServicesRepository servicesRepository,
+    IServicesService servicesService,
     IHubContext<MetricsHub> hubContext) : IMetricsService
 {
-    private static readonly ConcurrentDictionary<string, ServiceStatus> ServiceStatuses = new();
+    // Ключ: serviceId. Статус живе у пам'яті, відновлюється з потоку метрик.
+    private static readonly ConcurrentDictionary<int, ServiceStatus> ServiceStatuses = new();
     private static readonly object ServiceStatusLock = new();
 
-    public async Task IngestAsync(MetricIngestionRequest request)
+    public async Task IngestAsync(ApiKeyEntity apiKey, MetricIngestionRequest request)
     {
-        if (string.IsNullOrEmpty(request.ServiceName))
+        if (string.IsNullOrWhiteSpace(request.ServiceName))
             throw new Exception("Ім'я сервісу обов'язкове");
-        
-        var anomalies = new List<AnomalyResult>();
+
         var serviceName = request.ServiceName.Trim();
+        var service = await servicesService.GetOrCreateAsync(apiKey, serviceName);
+
+        var anomalies = new List<AnomalyResult>();
 
         foreach (var metric in request.Metrics)
         {
@@ -33,22 +38,21 @@ public class MetricsService(
 
             await metricPointRepository.AddAsync(new MetricPointEntity
             {
-                Id = metric.Id,
-                ServiceName = metric.ServiceName,
+                ServiceId = service.Id,
                 MetricName = metric.MetricName,
                 Value = metric.Value,
                 Timestamp = metric.Timestamp,
                 Tags = metric.Tags
             });
 
-            var anomaly = anomalyDetectionService.Analyze(metric);
+            var anomaly = anomalyDetectionService.Analyze(service.Id, serviceName, metric);
             if (anomaly.IsAnomaly)
             {
                 anomalies.Add(anomaly);
 
                 await anomalyRepository.AddAsync(new AnomalyEntity
                 {
-                    ServiceName = anomaly.ServiceName,
+                    ServiceId = service.Id,
                     MetricName = anomaly.MetricName,
                     Value = anomaly.Value,
                     ExpectedValue = anomaly.ExpectedValue,
@@ -58,50 +62,62 @@ public class MetricsService(
                 });
             }
 
-            UpdateServiceStatus(metric, anomaly.IsAnomaly);
+            UpdateServiceStatus(service.Id, serviceName, metric, anomaly.IsAnomaly);
         }
-        
-        await hubContext.Clients.All.SendAsync("MetricsUpdated", request.Metrics);
+
+        var group = GroupName(apiKey.Id);
+        await hubContext.Clients.Group(group).SendAsync("MetricsUpdated", request.Metrics);
 
         if (anomalies.Count != 0)
-            await hubContext.Clients.All.SendAsync("AnomaliesDetected", anomalies);
+            await hubContext.Clients.Group(group).SendAsync("AnomaliesDetected", anomalies);
 
-        await hubContext.Clients.All.SendAsync("ServiceStatusUpdated", GetServiceStatuses());
+        await hubContext.Clients.Group(group)
+            .SendAsync("ServiceStatusUpdated", await GetServiceStatusesAsync(apiKey));
     }
 
     public async Task<List<MetricPoint>> GetMetricsAsync(
+        ApiKeyEntity apiKey,
         string serviceName,
         string metricName,
         DateTime from,
         DateTime to)
     {
+        var service = await servicesRepository.FindByApiKeyAndNameAsync(apiKey.Id, serviceName);
+        if (service == null)
+            return new List<MetricPoint>();
+
         var query = metricPointRepository.GetAll(m =>
-            m.ServiceName == serviceName &&
+            m.ServiceId == service.Id &&
             m.MetricName == metricName &&
             m.Timestamp >= from &&
             m.Timestamp <= to);
 
-        var entities = query
-            .OrderBy(m => m.Timestamp);
-
-        return entities.Select(e => new MetricPoint
-        {
-            Id = e.Id,
-            ServiceName = e.ServiceName,
-            MetricName = e.MetricName,
-            Value = e.Value,
-            Timestamp = e.Timestamp,
-            Tags = e.Tags
-        }).ToList();
+        return query
+            .OrderBy(m => m.Timestamp)
+            .Select(e => new MetricPoint
+            {
+                Id = e.Id,
+                ServiceName = serviceName,
+                MetricName = e.MetricName,
+                Value = e.Value,
+                Timestamp = e.Timestamp,
+                Tags = e.Tags
+            })
+            .ToList();
     }
 
-    public List<AnomalyResult> GetRecentAnomaliesAsync(int count = 20)
+    public async Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, int count)
     {
-        var entities = anomalyRepository.GetRecentAnomalies(count).ToList();
+        var services = await servicesRepository.GetByApiKeyAsync(apiKey.Id);
+        if (services.Count == 0)
+            return new List<AnomalyResult>();
+
+        var serviceIds = services.Select(s => s.Id).ToList();
+        var entities = await anomalyRepository.GetRecentAnomaliesAsync(serviceIds, count);
 
         return entities.Select(e => new AnomalyResult
         {
-            ServiceName = e.ServiceName,
+            ServiceName = e.Service?.Name ?? string.Empty,
             MetricName = e.MetricName,
             Value = e.Value,
             ExpectedValue = e.ExpectedValue,
@@ -111,7 +127,9 @@ public class MetricsService(
         }).ToList();
     }
 
-    public async Task<SrCnnBatchAnalysisResponse> AnalyzeSrCnnBatchAsync(SrCnnBatchAnalysisRequest request)
+    public async Task<SrCnnBatchAnalysisResponse> AnalyzeSrCnnBatchAsync(
+        ApiKeyEntity apiKey,
+        SrCnnBatchAnalysisRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.ServiceName))
             throw new Exception("Ім'я сервісу обов'язкове");
@@ -129,7 +147,7 @@ public class MetricsService(
         var from = request.From ?? DateTime.UtcNow.AddDays(-1);
         var to = request.To ?? DateTime.UtcNow;
 
-        var metrics = await GetMetricsAsync(request.ServiceName, request.MetricName, from, to);
+        var metrics = await GetMetricsAsync(apiKey, request.ServiceName, request.MetricName, from, to);
 
         var timeSeries = metrics
             .OrderBy(x => x.Timestamp)
@@ -180,6 +198,7 @@ public class MetricsService(
     }
 
     public async Task<AnomalyAlgorithmComparisonResponse> CompareAnomalyAlgorithmsAsync(
+        ApiKeyEntity apiKey,
         AnomalyAlgorithmComparisonRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.ServiceName))
@@ -190,11 +209,12 @@ public class MetricsService(
 
         if (request.From.HasValue && request.To.HasValue && request.From > request.To)
             throw new Exception("Дата від має бути раніше, ніж дата до");
-        
+
         var from = request.From ?? DateTime.UtcNow.AddHours(-1);
         var to = request.To ?? DateTime.UtcNow;
 
         var metrics = await GetMetricsAsync(
+            apiKey,
             request.ServiceName,
             request.MetricName,
             from,
@@ -219,52 +239,88 @@ public class MetricsService(
         };
     }
 
-    public List<ServiceStatus> GetServiceStatuses()
+    public async Task<List<ServiceStatus>> GetServiceStatusesAsync(ApiKeyEntity apiKey)
     {
+        var services = await servicesRepository.GetByApiKeyAsync(apiKey.Id);
+
         lock (ServiceStatusLock)
         {
-            return ServiceStatuses.Values
+            return services
+                .Select(s =>
+                {
+                    if (ServiceStatuses.TryGetValue(s.Id, out var status))
+                        return CloneStatus(status);
+
+                    return new ServiceStatus
+                    {
+                        ServiceName = s.Name,
+                        IsHealthy = false,
+                        LastSeen = DateTime.MinValue,
+                        AnomalyCount = 0,
+                        LatestMetrics = new()
+                    };
+                })
                 .OrderBy(s => s.ServiceName)
-                .Select(CloneStatus)
                 .ToList();
         }
     }
 
     public async Task RefreshServiceHealthAsync(TimeSpan timeout)
     {
-        var changed = false;
         var now = DateTime.UtcNow;
+        var services = servicesRepository.GetAll().ToList();
+        var changedApiKeys = new HashSet<int>();
 
         lock (ServiceStatusLock)
         {
-            foreach (var status in ServiceStatuses.Values)
+            foreach (var svc in services)
             {
+                if (!ServiceStatuses.TryGetValue(svc.Id, out var status))
+                    continue;
+
                 var isHealthy = now - ToUtc(status.LastSeen) <= timeout;
                 if (status.IsHealthy == isHealthy)
                     continue;
 
                 status.IsHealthy = isHealthy;
-                changed = true;
+                changedApiKeys.Add(svc.ApiKeyId);
             }
         }
 
-        if (changed)
-            await hubContext.Clients.All.SendAsync("ServiceStatusUpdated", GetServiceStatuses());
+        foreach (var apiKeyId in changedApiKeys)
+        {
+            var apiServices = services.Where(s => s.ApiKeyId == apiKeyId).ToList();
+
+            List<ServiceStatus> snapshot;
+            lock (ServiceStatusLock)
+            {
+                snapshot = apiServices
+                    .Select(s => ServiceStatuses.TryGetValue(s.Id, out var st)
+                        ? CloneStatus(st)
+                        : new ServiceStatus { ServiceName = s.Name, IsHealthy = false })
+                    .OrderBy(s => s.ServiceName)
+                    .ToList();
+            }
+
+            await hubContext.Clients
+                .Group(GroupName(apiKeyId))
+                .SendAsync("ServiceStatusUpdated", snapshot);
+        }
     }
 
-    private static void UpdateServiceStatus(MetricPoint metric, bool hasAnomaly)
+    private static void UpdateServiceStatus(int serviceId, string serviceName, MetricPoint metric, bool hasAnomaly)
     {
         lock (ServiceStatusLock)
         {
             var status = ServiceStatuses.GetOrAdd(
-                metric.ServiceName,
+                serviceId,
                 _ => new ServiceStatus
                 {
-                    ServiceName = metric.ServiceName,
+                    ServiceName = serviceName,
                     IsHealthy = true
                 });
 
-            status.ServiceName = metric.ServiceName;
+            status.ServiceName = serviceName;
             status.LastSeen = ToUtc(metric.Timestamp);
             status.IsHealthy = true;
             status.LatestMetrics[metric.MetricName] = metric.Value;
@@ -273,6 +329,8 @@ public class MetricsService(
                 status.AnomalyCount++;
         }
     }
+
+    private static string GroupName(int apiKeyId) => $"apiKey:{apiKeyId}";
 
     private static DateTime ToUtc(DateTime value) =>
         value.Kind switch

@@ -1,45 +1,98 @@
-﻿// js/page-keys.js — сторінка "API Ключі"
+// js/page-keys.js — сторінка "Мій профіль": інформація про ключ + керування сервісами
 
-// Завантажити список ключів
+// Завантажити інфо про поточний ключ + список сервісів
 async function keysLoad() {
-    const tbody = document.getElementById('keys-tbody');
-    tbody.innerHTML = `<tr><td colspan="6" class="empty loading">Завантаження...</td></tr>`;
+    const infoBox = document.getElementById('key-info');
+    const servicesBody = document.getElementById('services-tbody');
+
+    if (!getApiKey()) {
+        infoBox.innerHTML = `<div class="empty">Введіть API ключ у полі вгорі сторінки, щоб побачити свій профіль.</div>`;
+        servicesBody.innerHTML = `<tr><td colspan="3" class="empty">—</td></tr>`;
+        return;
+    }
+
+    infoBox.innerHTML = `<div class="empty loading">Завантаження...</div>`;
+    servicesBody.innerHTML = `<tr><td colspan="3" class="empty loading">Завантаження...</td></tr>`;
+
     try {
-        const keys = await apiFetch('/api/keys');
-        if (!keys?.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="empty">Ключів ще немає. Створіть перший.</td></tr>`;
+        const me = await apiFetch('/api/keys/me');
+        infoBox.innerHTML = `
+          <div class="stat-row"><span class="stat-label">ID ключа</span><span class="stat-value">#${me.id}</span></div>
+          <div class="stat-row"><span class="stat-label">Власник</span><span class="stat-value">${me.owner}</span></div>
+          <div class="stat-row"><span class="stat-label">Превʼю ключа</span><span class="stat-value" style="font-family:var(--mono)">${me.key}</span></div>
+          <div class="stat-row"><span class="stat-label">Статус</span><span class="badge ${me.isActive ? 'badge-active' : 'badge-revoked'}">${me.isActive ? 'Активний' : 'Відкликаний'}</span></div>
+          <div class="stat-row"><span class="stat-label">Створено</span><span class="stat-value">${fmtDate(me.createdAt)}</span></div>
+          <div class="stat-row"><span class="stat-label">Останнє використання</span><span class="stat-value">${fmtDate(me.lastUsedAt)}</span></div>
+          <div class="btn-row" style="margin-top:14px">
+            <button class="btn btn-danger" onclick="keysRevoke(${me.id})">Відкликати ключ</button>
+          </div>`;
+    } catch (err) {
+        infoBox.innerHTML = `<div class="empty" style="color:var(--red)">${err.message}</div>`;
+    }
+
+    try {
+        const services = await apiFetch('/api/services');
+        if (!services?.length) {
+            servicesBody.innerHTML = `<tr><td colspan="3" class="empty">Сервісів ще немає. Зареєструйте перший.</td></tr>`;
             return;
         }
-        tbody.innerHTML = keys.map(k => `
-      <tr>
-        <td>${k.id}</td>
-        <td style="color:var(--accent);font-family:var(--mono)">${k.serviceName}</td>
-        <td class="td-muted">${k.owner ?? '—'}</td>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${k.key ?? '***...'}</td>
-        <td><span class="badge ${k.isActive ? 'badge-active' : 'badge-revoked'}">${k.isActive ? 'Активний' : 'Відкликаний'}</span></td>
-        <td class="td-muted">${fmtDate(k.lastUsedAt)}</td>
-        <td>
-          ${k.isActive
-            ? `<button class="btn btn-danger" onclick="keysRevoke(${k.id}, this)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                Відкликати
-               </button>`
-            : '<span class="td-muted">—</span>'}
-        </td>
-      </tr>`).join('');
+        servicesBody.innerHTML = services.map(s => `
+          <tr>
+            <td>${s.id}</td>
+            <td style="color:var(--accent);font-family:var(--mono)">${s.name}</td>
+            <td>
+              <button class="btn btn-danger" onclick="serviceDelete(${s.id})">Видалити</button>
+            </td>
+          </tr>`).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty" style="color:var(--red)">${err.message}</td></tr>`;
+        servicesBody.innerHTML = `<tr><td colspan="3" class="empty" style="color:var(--red)">${err.message}</td></tr>`;
+    }
+}
+
+// Зареєструвати новий сервіс під поточним ключем
+async function serviceCreate() {
+    if (!requireApiKey()) return;
+
+    const name = document.getElementById('svc-name').value?.trim();
+    const btn = document.getElementById('svc-create-btn');
+
+    if (!name) { toast('Вкажіть назву сервісу', 'error'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Створення...';
+
+    try {
+        const s = await apiFetch('/api/services', {
+            method: 'POST',
+            body: JSON.stringify({ name }),
+        });
+        toast(`Сервіс "${s.name}" зареєстровано`, 'success');
+        document.getElementById('svc-name').value = '';
+        keysLoad();
+    } catch (err) {
+        toast(err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Зареєструвати';
+    }
+}
+
+// Видалити сервіс
+async function serviceDelete(id) {
+    if (!confirm(`Видалити сервіс #${id}? Усі метрики та аномалії, повʼязані з ним, теж зникнуть.`)) return;
+    try {
+        await apiFetch(`/api/services/${id}`, { method: 'DELETE' });
+        toast('Сервіс видалено', 'success');
+        keysLoad();
+    } catch (err) {
         toast(err.message, 'error');
     }
 }
 
-// Створити новий ключ
+// Згенерувати новий API ключ (без авторизації)
 async function keysCreate() {
-    const serviceName = document.getElementById('key-service').value?.trim();
-    const owner       = document.getElementById('key-owner').value?.trim();
-    const btn         = document.getElementById('key-create-btn');
-
-    if (!serviceName) { toast('Вкажіть назву сервісу', 'error'); return; }
+    const owner = document.getElementById('new-key-owner').value?.trim();
+    const btn = document.getElementById('new-key-btn');
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Генерація...';
@@ -47,68 +100,60 @@ async function keysCreate() {
     try {
         const data = await apiFetch('/api/keys', {
             method: 'POST',
-            body: JSON.stringify({ serviceName, owner: owner || undefined }),
+            body: JSON.stringify({ owner: owner || undefined }),
         });
 
-        // Показуємо модалку з ключем
-        document.getElementById('modal-key-service').textContent = data.serviceName;
-        document.getElementById('modal-key-value').textContent   = data.apiKey;
-        document.getElementById('modal-key-usage').textContent   = data.usage;
+        document.getElementById('modal-key-owner').textContent = data.owner;
+        document.getElementById('modal-key-value').textContent = data.apiKey;
+        document.getElementById('modal-key-usage').textContent = data.usage;
         document.getElementById('key-modal').classList.add('open');
 
-        // Очищаємо форму
-        document.getElementById('key-service').value = '';
-        document.getElementById('key-owner').value   = '';
-
-        toast('Ключ успішно створено', 'success');
-        keysLoad(); // оновлюємо таблицю
-
+        document.getElementById('new-key-owner').value = '';
+        toast('Ключ створено. Збережіть його!', 'success');
     } catch (err) {
         toast(err.message, 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Створити ключ';
+        btn.textContent = 'Створити новий ключ';
     }
 }
 
-// Відкликати ключ
-async function keysRevoke(id, btnEl) {
-    if (!confirm(`Відкликати ключ #${id}? Дію не можна скасувати.`)) return;
-
-    btnEl.disabled = true;
-    btnEl.innerHTML = '<span class="spinner"></span>';
-
+// Деактивувати поточний ключ
+async function keysRevoke(id) {
+    if (!confirm(`Відкликати ключ #${id}? Дашборд перестане отримувати ваші дані.`)) return;
     try {
         const data = await apiFetch(`/api/keys/${id}`, { method: 'DELETE' });
         toast(data.message || 'Ключ відкликано', 'success');
-        keysLoad();
+        setApiKey('');
+        location.reload();
     } catch (err) {
         toast(err.message, 'error');
-        btnEl.disabled = false;
-        btnEl.textContent = 'Відкликати';
     }
 }
 
-// Закрити модалку
 function keysCloseModal() {
     document.getElementById('key-modal').classList.remove('open');
 }
 
-// API Key налаштування у хедері
+// Зберегти ключ з хедера
 function headerApiKeySave() {
     const val = document.getElementById('header-api-key').value?.trim();
     if (val) {
-        localStorage.setItem('apiKey', val);
-        toast('API ключ збережено для цієї сесії', 'success');
+        setApiKey(val);
+        toast('API ключ збережено — перезавантажуємо...', 'success');
+        setTimeout(() => location.reload(), 500);
     } else {
-        localStorage.removeItem('apiKey');
+        setApiKey('');
         toast('API ключ очищено', 'info');
+        setTimeout(() => location.reload(), 500);
     }
 }
 
 // Init
 document.addEventListener('DOMContentLoaded', () => {
-    // Підставляємо збережений ключ
-    const saved = localStorage.getItem('apiKey');
-    if (saved) document.getElementById('header-api-key').value = saved;
+    const saved = getApiKey();
+    if (saved) {
+        const el = document.getElementById('header-api-key');
+        if (el) el.value = saved;
+    }
 });

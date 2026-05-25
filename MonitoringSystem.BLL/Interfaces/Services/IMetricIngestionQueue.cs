@@ -1,11 +1,10 @@
-﻿using MonitoringSystem.BLL.Models;
 using MonitoringSystem.BLL.Models.Metrics;
 
 namespace MonitoringSystem.BLL.Interfaces.Services;
 
 public interface IMetricIngestionQueue
 {
-    ValueTask QueueAsync(MetricIngestionRequest request, CancellationToken cancellationToken = default);
-    
-    ValueTask<MetricIngestionRequest> DequeueAsync(CancellationToken cancellationToken);
+    ValueTask QueueAsync(MetricIngestionEnvelope envelope, CancellationToken cancellationToken = default);
+
+    ValueTask<MetricIngestionEnvelope> DequeueAsync(CancellationToken cancellationToken);
 }

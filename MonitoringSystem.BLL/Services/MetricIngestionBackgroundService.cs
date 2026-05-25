@@ -15,11 +15,11 @@ public class MetricIngestionBackgroundService(
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            MetricIngestionRequest request;
+            MetricIngestionEnvelope envelope;
 
             try
             {
-                request = await queue.DequeueAsync(stoppingToken);
+                envelope = await queue.DequeueAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -31,15 +31,15 @@ public class MetricIngestionBackgroundService(
                 using var scope = scopeFactory.CreateScope();
                 var metricsService = scope.ServiceProvider.GetRequiredService<IMetricsService>();
 
-                await metricsService.IngestAsync(request);
+                await metricsService.IngestAsync(envelope.ApiKey, envelope.Request);
             }
             catch (Exception ex)
             {
                 logger.LogError(
                     ex,
                     "Не вдалося отримати показники з черги для служби {ServiceName}. Кількість показників: {MetricsCount}",
-                    request.ServiceName,
-                    request.Metrics.Count);
+                    envelope.Request.ServiceName,
+                    envelope.Request.Metrics.Count);
             }
         }
     }

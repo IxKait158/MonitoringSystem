@@ -1,90 +1,17 @@
-﻿using System.Diagnostics;
-using MonitoringSystem.BLL.Interfaces.Services;
-using MonitoringSystem.BLL.Models;
-using MonitoringSystem.BLL.Models.Metrics;
-
 namespace MonitoringSystem.Middlewares;
 
-public class MetricsCollectionMiddleware(
-    RequestDelegate next,
-    string serviceName)
+/// <summary>
+/// Раніше збирав метрики самого API в єдиний "MonitoringAPI" сервіс.
+/// Тепер метрики приходять виключно від користувацьких сервісів за X-API-KEY,
+/// тож цей middleware просто передає запит далі. Залишений для зворотної сумісності pipeline.
+/// </summary>
+public class MetricsCollectionMiddleware(RequestDelegate next)
 {
-    private static long _requestCount = 0;
-    private static long _errorCount = 0;
-
-    public async Task InvokeAsync(HttpContext context, IMetricIngestionQueue ingestionQueue)
-    {
-        if (context.Request.Path.StartsWithSegments("/health") ||
-            context.Request.Path.StartsWithSegments("/metrics"))
-        {
-            await next(context);
-            return;
-        }
-        
-        var sw = Stopwatch.StartNew();
-        Interlocked.Increment(ref _requestCount);
-
-        try
-        {
-            await next(context);
-
-            if (context.Response.StatusCode >= 500)
-                Interlocked.Increment(ref _errorCount);
-        }
-        catch
-        {
-            Interlocked.Increment(ref _errorCount);
-            throw;
-        }
-        finally
-        {
-            sw.Stop();
-
-            var metrics = new List<MetricPoint>
-            {
-                new()
-                {
-                    ServiceName = serviceName,
-                    MetricName = "http.response_time_ms",
-                    Value = sw.ElapsedMilliseconds,
-                    Timestamp = DateTime.UtcNow,
-                    Tags = new() { ["path"] = context.Request.Path, ["method"] = context.Request.Method }
-                },
-                new()
-                {
-                    ServiceName = serviceName,
-                    MetricName = "system.memory_mb",
-                    Value = GC.GetTotalMemory(false) / 1024.0 / 1024.0,
-                    Timestamp = DateTime.UtcNow
-                },
-                new()
-                {
-                    ServiceName = serviceName,
-                    MetricName = "http.requests_total",
-                    Value = Interlocked.Read(ref _requestCount),
-                    Timestamp = DateTime.UtcNow
-                },
-                new()
-                {
-                    ServiceName = serviceName,
-                    MetricName = "http.errors_total",
-                    Value = Interlocked.Read(ref _errorCount),
-                    Timestamp = DateTime.UtcNow
-                }
-            };
-
-            await ingestionQueue.QueueAsync(new MetricIngestionRequest
-            {
-                ServiceName = serviceName,
-                Metrics = metrics
-            });
-        }
-    }
+    public Task InvokeAsync(HttpContext context) => next(context);
 }
 
 public static class MetricsMiddlewareExtensions
 {
-    public static IApplicationBuilder UseMetricsCollection(
-        this IApplicationBuilder app, string serviceName) =>
-        app.UseMiddleware<MetricsCollectionMiddleware>(serviceName);
+    public static IApplicationBuilder UseMetricsCollection(this IApplicationBuilder app) =>
+        app.UseMiddleware<MetricsCollectionMiddleware>();
 }

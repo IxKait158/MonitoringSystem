@@ -49,7 +49,6 @@ app.UseCors();
 app.UseSerilogRequestLogging();
 
 app.UseApiKeyAuth();
-app.UseMetricsCollection("MonitoringAPI");
 
 app.MapControllers();
 app.MapHub<MetricsHub>("/hub/metrics");

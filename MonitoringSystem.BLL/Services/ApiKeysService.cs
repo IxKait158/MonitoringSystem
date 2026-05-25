@@ -1,4 +1,4 @@
-﻿using MonitoringSystem.BLL.Interfaces.Repositories;
+using MonitoringSystem.BLL.Interfaces.Repositories;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models.ApiKeys;
 using MonitoringSystem.Domain.Entities;
@@ -9,49 +9,38 @@ public class ApiKeysService(IApiKeysRepository apiKeysRepository) : IApiKeysServ
 {
     public async Task<string> CreateAsync(CreateApiKeyRequest request)
     {
-        if (string.IsNullOrEmpty(request.ServiceName))
-            throw new Exception("Ім'я сервісу обов'язкове");
-
         var key = $"mk_{Guid.NewGuid():N}{Guid.NewGuid():N}"[..36];
 
         var apiKey = new ApiKeyEntity
         {
             Key = key,
-            ServiceName = request.ServiceName,
-            Owner = string.IsNullOrEmpty(request.Owner) ? "unknown" : request.Owner,
+            Owner = string.IsNullOrWhiteSpace(request.Owner) ? "unknown" : request.Owner.Trim(),
             IsActive = true
         };
-        
+
         await apiKeysRepository.AddAsync(apiKey);
 
         return key;
     }
 
-    public List<ApiKey> GetAll()
-    {
-        var keys = apiKeysRepository
-            .GetAllNoTracking()
-            .Select(x => new ApiKey
-            {
-                Id = x.Id,
-                Key = x.Key[..8] + "...",
-                ServiceName = x.ServiceName,
-                Owner = x.Owner,
-                IsActive = x.IsActive,
-                CreatedAt = x.CreatedAt,
-                LastUsedAt = x.LastUsedAt
-            })
-            .ToList();
-
-        return keys;
-    }
+    public ApiKey GetCurrent(ApiKeyEntity apiKey) =>
+        new()
+        {
+            Id = apiKey.Id,
+            Key = apiKey.Key[..8] + "...",
+            Owner = apiKey.Owner,
+            IsActive = apiKey.IsActive,
+            CreatedAt = apiKey.CreatedAt,
+            LastUsedAt = apiKey.LastUsedAt,
+            ServiceCount = apiKey.Services?.Count ?? 0
+        };
 
     public async Task<ApiKey> DeactivateApiKeyAsync(int id)
     {
         var key = await apiKeysRepository.GetByIdAsync(id);
         if (key == null)
             throw new Exception("Ключ не знайдено");
-        
+
         key.IsActive = false;
         await apiKeysRepository.UpdateAsync(key);
 
@@ -59,7 +48,6 @@ public class ApiKeysService(IApiKeysRepository apiKeysRepository) : IApiKeysServ
         {
             Id = key.Id,
             Key = key.Key[..8] + "...",
-            ServiceName = key.ServiceName,
             Owner = key.Owner,
             IsActive = key.IsActive,
             CreatedAt = key.CreatedAt,

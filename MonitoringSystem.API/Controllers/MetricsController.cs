@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models.Metrics;
+using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.Controllers;
 
@@ -8,8 +9,12 @@ namespace MonitoringSystem.Controllers;
 [Route("api/[controller]")]
 public class MetricsController(IMetricsService metricsService) : ControllerBase
 {
+    private ApiKeyEntity CurrentApiKey =>
+        (ApiKeyEntity)HttpContext.Items["ApiKey"]!;
+
     /// <summary>
-    /// Прийом метрик від зовнішніх сервісів (або від middleware)
+    /// Прийом метрик від користувацького сервісу за X-API-KEY.
+    /// Сервіс створюється автоматично, якщо ще не зареєстрований під цим ключем.
     /// POST /api/metrics/ingest
     /// </summary>
     [HttpPost("ingest")]
@@ -17,23 +22,17 @@ public class MetricsController(IMetricsService metricsService) : ControllerBase
     {
         try
         {
-            await metricsService.IngestAsync(request);
-            return Ok(new
-            {
-                received = request.Metrics.Count
-            });
+            await metricsService.IngestAsync(CurrentApiKey, request);
+            return Ok(new { received = request.Metrics.Count });
         }
         catch (Exception ex)
         {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
+            return BadRequest(new { message = ex.Message });
         }
     }
 
     /// <summary>
-    /// Отримати метрики за часовим діапазоном
+    /// Метрики поточного користувача за часовим діапазоном.
     /// GET /api/metrics?service=MyService&metric=cpu&from=...&to=...
     /// </summary>
     [HttpGet]
@@ -48,36 +47,30 @@ public class MetricsController(IMetricsService metricsService) : ControllerBase
             var fromDate = from ?? DateTime.UtcNow.AddHours(-1);
             var toDate = to ?? DateTime.UtcNow;
 
-            var metrics = await metricsService.GetMetricsAsync(service, metric, fromDate, toDate);
+            var metrics = await metricsService.GetMetricsAsync(CurrentApiKey, service, metric, fromDate, toDate);
             return Ok(metrics);
         }
         catch (Exception ex)
         {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
+            return BadRequest(new { message = ex.Message });
         }
     }
 
     /// <summary>
-    /// Поточний статус всіх сервісів
+    /// Поточний статус усіх сервісів цього API ключа.
     /// GET /api/metrics/services
     /// </summary>
     [HttpGet("services")]
-    public IActionResult GetServices()
+    public async Task<IActionResult> GetServices()
     {
         try
         {
-            var statuses = metricsService.GetServiceStatuses();
+            var statuses = await metricsService.GetServiceStatusesAsync(CurrentApiKey);
             return Ok(statuses);
         }
         catch (Exception ex)
         {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
+            return BadRequest(new { message = ex.Message });
         }
     }
 }

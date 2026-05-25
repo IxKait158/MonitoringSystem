@@ -1,25 +1,32 @@
-﻿using MonitoringSystem.BLL.Models;
 using MonitoringSystem.BLL.Models.Anomalies;
 using MonitoringSystem.BLL.Models.Metrics;
 using MonitoringSystem.BLL.Models.Services;
+using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.BLL.Interfaces.Services;
 
 public interface IMetricsService
 {
-    Task IngestAsync(MetricIngestionRequest request);
+    Task IngestAsync(ApiKeyEntity apiKey, MetricIngestionRequest request);
 
-    Task<List<MetricPoint>> GetMetricsAsync(string serviceName, string metricName, DateTime from,
+    Task<List<MetricPoint>> GetMetricsAsync(
+        ApiKeyEntity apiKey,
+        string serviceName,
+        string metricName,
+        DateTime from,
         DateTime to);
 
-    List<AnomalyResult> GetRecentAnomaliesAsync(int count);
+    Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, int count);
 
     Task<AnomalyAlgorithmComparisonResponse> CompareAnomalyAlgorithmsAsync(
+        ApiKeyEntity apiKey,
         AnomalyAlgorithmComparisonRequest request);
 
-    Task<SrCnnBatchAnalysisResponse> AnalyzeSrCnnBatchAsync(SrCnnBatchAnalysisRequest request);
+    Task<SrCnnBatchAnalysisResponse> AnalyzeSrCnnBatchAsync(
+        ApiKeyEntity apiKey,
+        SrCnnBatchAnalysisRequest request);
 
-    List<ServiceStatus> GetServiceStatuses();
+    Task<List<ServiceStatus>> GetServiceStatusesAsync(ApiKeyEntity apiKey);
 
     Task RefreshServiceHealthAsync(TimeSpan timeout);
 }

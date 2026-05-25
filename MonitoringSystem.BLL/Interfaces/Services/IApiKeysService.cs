@@ -1,12 +1,13 @@
-﻿using MonitoringSystem.BLL.Models.ApiKeys;
+using MonitoringSystem.BLL.Models.ApiKeys;
+using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.BLL.Interfaces.Services;
 
 public interface IApiKeysService
 {
     Task<string> CreateAsync(CreateApiKeyRequest request);
-    
-    List<ApiKey> GetAll();
-    
+
+    ApiKey GetCurrent(ApiKeyEntity apiKey);
+
     Task<ApiKey> DeactivateApiKeyAsync(int id);
 }

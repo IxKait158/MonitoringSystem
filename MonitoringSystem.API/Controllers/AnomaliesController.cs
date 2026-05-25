@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models.Anomalies;
+using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.Controllers;
 
@@ -8,29 +9,29 @@ namespace MonitoringSystem.Controllers;
 [Route("api/[controller]")]
 public class AnomaliesController(IMetricsService metricsService) : ControllerBase
 {
+    private ApiKeyEntity CurrentApiKey =>
+        (ApiKeyEntity)HttpContext.Items["ApiKey"]!;
+
     /// <summary>
-    /// Повертає нещодавно виявлені аномалії
+    /// Останні аномалії по сервісах поточного API ключа.
     /// GET /api/anomalies?count=20
     /// </summary>
     [HttpGet]
-    public IActionResult GetAnomalies([FromQuery] int count = 20)
+    public async Task<IActionResult> GetAnomalies([FromQuery] int count = 20)
     {
         try
         {
-            var anomalies = metricsService.GetRecentAnomaliesAsync(count);
+            var anomalies = await metricsService.GetRecentAnomaliesAsync(CurrentApiKey, count);
             return Ok(anomalies);
         }
         catch (Exception ex)
         {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
+            return BadRequest(new { message = ex.Message });
         }
     }
 
     /// <summary>
-    /// Порівнює алгоритми виявлення аномалій на історичних метричних даних
+    /// Порівнює Z-score і SrCnn на історичних даних сервісу поточного ключа.
     /// POST /api/anomalies/compare
     /// </summary>
     [HttpPost("compare")]
@@ -38,20 +39,17 @@ public class AnomaliesController(IMetricsService metricsService) : ControllerBas
     {
         try
         {
-            var comparison = await metricsService.CompareAnomalyAlgorithmsAsync(request);
+            var comparison = await metricsService.CompareAnomalyAlgorithmsAsync(CurrentApiKey, request);
             return Ok(comparison);
         }
         catch (Exception ex)
         {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
+            return BadRequest(new { message = ex.Message });
         }
     }
 
     /// <summary>
-    /// Пакетний SrCnn-аналіз архівних метричних даних (Spectral Residual + CNN).
+    /// Пакетний SrCnn-аналіз для сервісу поточного ключа.
     /// POST /api/anomalies/srcnn-batch
     /// </summary>
     [HttpPost("srcnn-batch")]
@@ -59,15 +57,12 @@ public class AnomaliesController(IMetricsService metricsService) : ControllerBas
     {
         try
         {
-            var result = await metricsService.AnalyzeSrCnnBatchAsync(request);
+            var result = await metricsService.AnalyzeSrCnnBatchAsync(CurrentApiKey, request);
             return Ok(result);
         }
         catch (Exception ex)
         {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
+            return BadRequest(new { message = ex.Message });
         }
     }
 }

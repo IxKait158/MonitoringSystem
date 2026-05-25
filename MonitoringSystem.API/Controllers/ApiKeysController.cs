@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using MonitoringSystem.BLL.Interfaces.Services;
 using MonitoringSystem.BLL.Models.ApiKeys;
+using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.Controllers;
 
@@ -8,8 +9,11 @@ namespace MonitoringSystem.Controllers;
 [Route("api/keys")]
 public class ApiKeysController(IApiKeysService apiKeysService) : ControllerBase
 {
+    private ApiKeyEntity? CurrentApiKey =>
+        HttpContext.Items["ApiKey"] as ApiKeyEntity;
+
     /// <summary>
-    /// Генерує новий API ключ для сервісу
+    /// Створює новий API ключ для користувача. Не потребує авторизації.
     /// POST /api/keys
     /// </summary>
     [HttpPost]
@@ -21,62 +25,55 @@ public class ApiKeysController(IApiKeysService apiKeysService) : ControllerBase
             return Ok(new
             {
                 apiKey = key,
-                serviceName = request.ServiceName,
+                owner = string.IsNullOrWhiteSpace(request.Owner) ? "unknown" : request.Owner,
                 message = "Збережіть цей ключ — він більше не буде показаний повністю",
-                usage = $"Додавати до запитів заголовок: X-API-KEY: {key}"
+                usage = $"Додавайте до запитів заголовок: X-API-KEY: {key}"
             });
         }
         catch (Exception ex)
         {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
+            return BadRequest(new { message = ex.Message });
         }
     }
 
     /// <summary>
-    /// Список всіх ключів (без показу самого ключа повністю)
-    /// GET /api/keys
+    /// Інформація про поточний API ключ (за заголовком X-API-KEY).
+    /// GET /api/keys/me
     /// </summary>
-    [HttpGet]
-    public IActionResult GetAll()
+    [HttpGet("me")]
+    public IActionResult GetCurrent()
     {
         try
         {
-            var keys = apiKeysService.GetAll();
-            return Ok(keys);
+            if (CurrentApiKey == null)
+                return Unauthorized(new { message = "API ключ відсутній" });
+
+            return Ok(apiKeysService.GetCurrent(CurrentApiKey));
         }
         catch (Exception ex)
         {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
+            return BadRequest(new { message = ex.Message });
         }
     }
 
     /// <summary>
-    /// Деактивувати ключ
+    /// Деактивувати поточний ключ (можна тільки свій).
     /// DELETE /api/keys/{id}
     /// </summary>
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
     public async Task<IActionResult> Revoke(int id)
     {
         try
         {
+            if (CurrentApiKey == null || CurrentApiKey.Id != id)
+                return Forbid();
+
             var key = await apiKeysService.DeactivateApiKeyAsync(id);
-            return Ok(new
-            {
-                message = $"Ключ для {key.ServiceName} деактивовано"
-            });
+            return Ok(new { message = $"Ключ #{key.Id} деактивовано" });
         }
         catch (Exception ex)
         {
-            return BadRequest(new
-            {
-                message = ex.Message
-            });
+            return BadRequest(new { message = ex.Message });
         }
     }
 }

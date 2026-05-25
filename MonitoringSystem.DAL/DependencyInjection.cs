@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IMetricPointRepository, MetricPointRepository>();
         services.AddScoped<IAnomalyRepository, AnomalyRepository>();
         services.AddScoped<IApiKeysRepository, ApiKeysesRepository>();
+        services.AddScoped<IServicesRepository, ServicesRepository>();
 
         return services;
     }
@@ -34,30 +35,33 @@ public static class DependencyInjection
             await context.Database.MigrateAsync();
 
             if (!await context.ApiKeys.AnyAsync())
-                await AddTestsApiKeys(context);
+                await SeedAsync(context);
         }
         catch (Exception ex)
         {
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<MonitoringDbContext>>();
-            logger.LogError(ex, $"Помилка при ініціалізації або міграції бази даних: {ex.Message}");
+            logger.LogError(ex, "Помилка при ініціалізації або міграції бази даних: {Message}", ex.Message);
         }
     }
 
-    private static async Task AddTestsApiKeys(MonitoringDbContext context)
+    private static async Task SeedAsync(MonitoringDbContext context)
     {
-        context.ApiKeys.AddRange(
-            new ApiKeyEntity
+        // Демо-користувач: один ключ + три зареєстровані сервіси під ним.
+        var devKey = new ApiKeyEntity
+        {
+            Key = "mk_dev_demo_user_key_0000000000000001",
+            Owner = "dev-team",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            Services = new List<ServiceEntity>
             {
-                Key = "mk_dev_order_service_key_001", ServiceName = "OrderService", Owner = "dev-team", IsActive = true
-            },
-            new ApiKeyEntity
-            {
-                Key = "mk_dev_payment_service_key_002", ServiceName = "PaymentService", Owner = "dev-team", IsActive = true
-            },
-            new ApiKeyEntity
-            {
-                Key = "mk_dev_user_service_key_003", ServiceName = "UserService", Owner = "dev-team", IsActive = true
-            });
+                new() { Name = "OrderService" },
+                new() { Name = "PaymentService" },
+                new() { Name = "UserService" }
+            }
+        };
+
+        context.ApiKeys.Add(devKey);
         await context.SaveChangesAsync();
     }
 }

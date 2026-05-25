@@ -74,7 +74,7 @@ namespace MonitoringSystem.DAL.Data.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_ApiKeys_Key",
                 table: "ApiKeys",
-                column: "Key",
+                column: "ApiKey",
                 unique: true);
 
             migrationBuilder.CreateIndex(
