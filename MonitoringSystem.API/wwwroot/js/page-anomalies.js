@@ -70,61 +70,6 @@ async function anomaliesLoad() {
     }
 }
 
-// Порівняння алгоритмів
-async function compareAlgorithms() {
-    const btn    = document.getElementById('cmp-btn');
-    const result = document.getElementById('cmp-result');
-    const service = document.getElementById('cmp-service').value?.trim();
-    const metric  = document.getElementById('cmp-metric').value?.trim();
-    const from    = localToUtcIso(document.getElementById('cmp-from').value);
-    const to      = localToUtcIso(document.getElementById('cmp-to').value);
-
-    if (!service || !metric) { toast('Вкажіть сервіс і метрику', 'error'); return; }
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Аналіз...';
-    result.innerHTML = '<div class="loading" style="padding:20px 0">Виконується порівняння алгоритмів...</div>';
-
-    try {
-        const body = { serviceName: service, metricName: metric, from, to };
-        const data = await apiFetch('/api/anomalies/compare', {
-            method: 'POST',
-            body: JSON.stringify(body),
-        });
-
-        const zs  = data.zScore  || {};
-        const src = data.srCnn   || {};
-
-        result.innerHTML = `
-      <div class="compare-grid">
-        <div class="compare-card">
-          <div class="compare-card-title">Z-score (real-time)</div>
-          <div class="stat-row"><span class="stat-label">Аномалій виявлено</span><span class="stat-value">${zs.anomalyCount ?? '—'}</span></div>
-          <div class="stat-row"><span class="stat-label">Precision</span><span class="stat-value">${zs.precision != null ? fmtNum(zs.precision, 3) : '—'}</span></div>
-          <div class="stat-row"><span class="stat-label">Recall</span><span class="stat-value">${zs.recall    != null ? fmtNum(zs.recall,    3) : '—'}</span></div>
-          <div class="stat-row"><span class="stat-label">F1-score</span><span class="stat-value" style="color:var(--accent)">${zs.f1Score   != null ? fmtNum(zs.f1Score,   3) : '—'}</span></div>
-          <div class="stat-row"><span class="stat-label">Час обробки</span><span class="stat-value">${zs.processingTimeMs != null ? zs.processingTimeMs + ' мс' : '—'}</span></div>
-        </div>
-        <div class="compare-card">
-          <div class="compare-card-title">SrCnn (пакетний)</div>
-          <div class="stat-row"><span class="stat-label">Аномалій виявлено</span><span class="stat-value">${src.anomalyCount ?? '—'}</span></div>
-          <div class="stat-row"><span class="stat-label">Precision</span><span class="stat-value">${src.precision != null ? fmtNum(src.precision, 3) : '—'}</span></div>
-          <div class="stat-row"><span class="stat-label">Recall</span><span class="stat-value">${src.recall    != null ? fmtNum(src.recall,    3) : '—'}</span></div>
-          <div class="stat-row"><span class="stat-label">F1-score</span><span class="stat-value" style="color:var(--purple)">${src.f1Score   != null ? fmtNum(src.f1Score,   3) : '—'}</span></div>
-          <div class="stat-row"><span class="stat-label">Час обробки</span><span class="stat-value">${src.processingTimeMs != null ? src.processingTimeMs + ' мс' : '—'}</span></div>
-        </div>
-      </div>`;
-        toast('Порівняння завершено', 'success');
-
-    } catch (err) {
-        result.innerHTML = `<div class="empty" style="color:var(--red)">${err.message}</div>`;
-        toast(err.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = 'Порівняти';
-    }
-}
-
 // Init
 document.addEventListener('DOMContentLoaded', () => {
     anomaliesLoadServices();

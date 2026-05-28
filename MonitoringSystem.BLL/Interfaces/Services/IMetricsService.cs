@@ -18,10 +18,6 @@ public interface IMetricsService
 
     Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, int count);
 
-    Task<AnomalyAlgorithmComparisonResponse> CompareAnomalyAlgorithmsAsync(
-        ApiKeyEntity apiKey,
-        AnomalyAlgorithmComparisonRequest request);
-
     Task<SrCnnBatchAnalysisResponse> AnalyzeSrCnnBatchAsync(
         ApiKeyEntity apiKey,
         SrCnnBatchAnalysisRequest request);

@@ -200,48 +200,6 @@ public class MetricsService(
         };
     }
 
-    public async Task<AnomalyAlgorithmComparisonResponse> CompareAnomalyAlgorithmsAsync(
-        ApiKeyEntity apiKey,
-        AnomalyAlgorithmComparisonRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.ServiceName))
-            throw new Exception("Ім'я сервісу обов'язкове");
-
-        if (string.IsNullOrWhiteSpace(request.MetricName))
-            throw new Exception("Ім'я метрики обов'язкове");
-
-        if (request.From.HasValue && request.To.HasValue && request.From > request.To)
-            throw new Exception("Дата від має бути раніше, ніж дата до");
-
-        var from = request.From ?? DateTime.UtcNow.AddHours(-1);
-        var to = request.To ?? DateTime.UtcNow;
-
-        var metrics = await GetMetricsAsync(
-            apiKey,
-            request.ServiceName,
-            request.MetricName,
-            from,
-            to);
-
-        var timeSeries = metrics
-            .OrderBy(x => x.Timestamp)
-            .Select(x => (x.Timestamp, x.Value))
-            .ToList();
-
-        return new AnomalyAlgorithmComparisonResponse
-        {
-            ServiceName = request.ServiceName,
-            MetricName = request.MetricName,
-            From = from,
-            To = to,
-            TotalPoints = timeSeries.Count,
-            Algorithms = anomalyDetectionService.CompareAlgorithms(
-                request.ServiceName,
-                request.MetricName,
-                timeSeries)
-        };
-    }
-
     public async Task<List<ServiceStatus>> GetServiceStatusesAsync(ApiKeyEntity apiKey)
     {
         var services = await servicesRepository.GetByApiKeyAsync(apiKey.Id);

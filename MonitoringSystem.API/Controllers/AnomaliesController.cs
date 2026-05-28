@@ -31,24 +31,6 @@ public class AnomaliesController(IMetricsService metricsService) : ControllerBas
     }
 
     /// <summary>
-    /// Порівнює Z-score і SrCnn на історичних даних сервісу поточного ключа.
-    /// POST /api/anomalies/compare
-    /// </summary>
-    [HttpPost("compare")]
-    public async Task<IActionResult> CompareAlgorithms([FromBody] AnomalyAlgorithmComparisonRequest request)
-    {
-        try
-        {
-            var comparison = await metricsService.CompareAnomalyAlgorithmsAsync(CurrentApiKey, request);
-            return Ok(comparison);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    /// <summary>
     /// Пакетний SrCnn-аналіз для сервісу поточного ключа.
     /// POST /api/anomalies/srcnn-batch
     /// </summary>

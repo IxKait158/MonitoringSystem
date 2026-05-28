@@ -44,16 +44,6 @@
             Аномалії
         </button>
 
-        <!-- Порівняння алгоритмів -->
-        <button class="nav-btn" data-page="compare" onclick="showPage('compare');">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="20" x2="18" y2="10"/>
-                <line x1="12" y1="20" x2="12" y2="4"/>
-                <line x1="6" y1="20" x2="6" y2="14"/>
-            </svg>
-            Алгоритми
-        </button>
-
         <!-- SrCnn пакетний аналіз -->
         <button class="nav-btn" data-page="srcnn" onclick="showPage('srcnn'); srcnnInit();">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -306,100 +296,7 @@
         </div>
 
     </div>
-
-    <!-- ПОРІВНЯННЯ АЛГОРИТМІВ  -->
-    <div id="page-compare" class="page">
-
-        <div class="card">
-            <div class="card-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="20" x2="18" y2="10"/>
-                    <line x1="12" y1="20" x2="12" y2="4"/>
-                    <line x1="6" y1="20" x2="6" y2="14"/>
-                </svg>
-                Порівняння Z-score vs SrCnn
-            </div>
-
-            <p style="font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.7">
-                Запустить аналіз одного часового ряду двома алгоритмами одночасно та поверне метрики точності.
-                Для коректного результату потрібно мати достатньо даних у вказаному діапазоні (≥ 30 точок).
-            </p>
-
-            <div class="form-grid">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Назва сервісу</label>
-                        <input type="text" id="cmp-service" placeholder="OrderService">
-                    </div>
-                    <div class="form-group">
-                        <label>Метрика</label>
-                        <input type="text" id="cmp-metric" placeholder="http.response_time_ms">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Від</label>
-                        <input type="datetime-local" id="cmp-from">
-                    </div>
-                    <div class="form-group">
-                        <label>До</label>
-                        <input type="datetime-local" id="cmp-to">
-                    </div>
-                </div>
-                <div class="btn-row">
-                    <button id="cmp-btn" class="btn btn-primary" onclick="compareAlgorithms()">Порівняти</button>
-                    <span style="font-size:11px;color:var(--muted)">POST /api/anomalies/compare</span>
-                </div>
-            </div>
-
-            <div id="cmp-result" style="margin-top:16px">
-                <div class="empty">Заповніть параметри та натисніть «Порівняти»</div>
-            </div>
-        </div>
-
-        <!-- Пояснення методів -->
-        <div class="charts-grid">
-            <div class="card">
-                <div class="card-title" style="color:var(--accent)">Z-score — real-time</div>
-                <div style="font-size:12px;color:var(--muted);line-height:1.8">
-                    <div class="stat-row"><span class="stat-label">Режим</span><span class="stat-value"
-                                                                                     style="color:var(--green)">Потоковий (O(1))</span>
-                    </div>
-                    <div class="stat-row"><span class="stat-label">Навчання</span><span
-                            class="stat-value">Не потрібне</span></div>
-                    <div class="stat-row"><span class="stat-label">Вікно</span><span class="stat-value">30 точок</span>
-                    </div>
-                    <div class="stat-row"><span class="stat-label">Поріг</span><span class="stat-value">2.5σ</span>
-                    </div>
-                    <div class="stat-row"><span class="stat-label">Тип аномалій</span><span
-                            class="stat-value">Точкові</span></div>
-                    <div class="stat-row"><span class="stat-label">Сезонність</span><span class="stat-value"
-                                                                                          style="color:var(--red)">Ні</span>
-                    </div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-title" style="color:var(--purple)">SrCnn — пакетний</div>
-                <div style="font-size:12px;color:var(--muted);line-height:1.8">
-                    <div class="stat-row"><span class="stat-label">Режим</span><span class="stat-value"
-                                                                                     style="color:var(--yellow)">Пакетний (O(n·logn))</span>
-                    </div>
-                    <div class="stat-row"><span class="stat-label">Навчання</span><span
-                            class="stat-value">Не потрібне</span></div>
-                    <div class="stat-row"><span class="stat-label">Алгоритм</span><span class="stat-value">FFT + CNN (KDD 2019)</span>
-                    </div>
-                    <div class="stat-row"><span class="stat-label">Поріг</span><span class="stat-value">0.3</span></div>
-                    <div class="stat-row"><span class="stat-label">Тип аномалій</span><span
-                            class="stat-value">Всі типи</span></div>
-                    <div class="stat-row"><span class="stat-label">Сезонність</span><span class="stat-value"
-                                                                                          style="color:var(--green)">Так</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
+    
     <!-- SRCNN — ПАКЕТНИЙ АНАЛІЗ АРХІВНИХ ДАНИХ -->
     <div id="page-srcnn" class="page">
 
