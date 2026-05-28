@@ -1,9 +1,11 @@
 using Microsoft.ML;
+using Microsoft.OpenApi;
 using MonitoringSystem.BLL;
 using MonitoringSystem.BLL.Hubs;
 using MonitoringSystem.DAL;
 using MonitoringSystem.Middlewares;
 using Serilog;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
@@ -16,9 +18,16 @@ builder.Host.UseSerilog();
 
 services.AddControllers();
 services.AddEndpointsApiExplorer();
-services.AddSwaggerGen(c =>
+services.AddSwaggerGen(options =>
 {
-    c.SwaggerDoc("v1", new() { Title = "MonitoringSystem.API", Version = "v1" });
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "MonitoringSystem.API",
+        Version = "v1"
+    });
+
+    if (builder.Environment.IsDevelopment())
+        options.OperationFilter<ApiKeyHeaderOperationFilter>();
 });
 
 services.AddDAL(builder.Configuration);
@@ -54,3 +63,20 @@ app.MapControllers();
 app.MapHub<MetricsHub>("/hub/metrics");
 
 app.Run();
+
+public class ApiKeyHeaderOperationFilter : IOperationFilter
+{
+    public void Apply(OpenApiOperation operation, OperationFilterContext context)
+    {
+        operation.Parameters ??= new List<IOpenApiParameter>();
+
+        operation.Parameters.Add(new OpenApiParameter
+        {
+            Name = "X-API-KEY",
+            In = ParameterLocation.Header,
+            Required = false,
+            Description = "API ключ для доступу до ендпоінтів",
+            Schema = new OpenApiSchema { Type = JsonSchemaType.String }
+        });
+    }
+}
