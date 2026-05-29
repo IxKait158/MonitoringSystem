@@ -22,12 +22,12 @@ while (true)
         var memBase = random.NextDouble() * 200 + 100;
         var responseTimeBase = random.NextDouble() * 50 + 20;
 
-        var isAnomaly = iteration % 50 == 0 && serviceName == "PaymentService";
+        var isAnomaly = iteration % 20 == 0 && serviceName == "PaymentService";
         if (isAnomaly)
         {
             cpuBase = 95 + random.NextDouble() * 5;
             responseTimeBase = 2000 + random.NextDouble() * 1000;
-            Console.WriteLine($"Simulate the anomaly for {serviceName}!");
+            Console.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] Simulate the anomaly for {serviceName}!");
         }
 
         var request = new
@@ -49,11 +49,11 @@ while (true)
                 Console.WriteLine(
                     $"SUCCESS: [{DateTime.UtcNow:HH:mm:ss}] {serviceName}: CPU={cpuBase:F1}%, Mem={memBase:F0}MB, RT={responseTimeBase:F0}ms");
             else
-                Console.WriteLine($"ERROR: Error for {serviceName}: {response.StatusCode}");
+                Console.WriteLine($"ERROR: [{DateTime.UtcNow:HH:mm:ss}] Error for {serviceName}: {response.StatusCode} - {response.Content.ReadAsStringAsync().Result}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"ERROR: Could not connect to API: {ex.Message}");
+            Console.WriteLine($"ERROR: [{DateTime.UtcNow:HH:mm:ss}] Could not connect to API: {ex.Message}");
         }
     }
 

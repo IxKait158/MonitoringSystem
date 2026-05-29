@@ -43,9 +43,9 @@ async function srcnnInit() {
 
     // Дефолтні дати: остання доба (в локальному часі ПК)
     const now = new Date();
-    const dayAgo = new Date(now - 86_400_000);
+    const hourAgo = new Date(now - 3600_000);
     document.getElementById('src-to').value = toLocalInputValue(now);
-    document.getElementById('src-from').value = toLocalInputValue(dayAgo);
+    document.getElementById('src-from').value = toLocalInputValue(hourAgo);
 }
 
 // Запуск SrCnn аналізу
