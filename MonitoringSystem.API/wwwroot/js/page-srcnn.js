@@ -5,14 +5,6 @@ let srcnnScoreChart = null;
 let srcnnLastResult = null;
 let srcnnInitialized = false;
 
-const SRCNN_METRICS = [
-    'http.response_time_ms',
-    'system.memory_mb',
-    'system.cpu_percent',
-    'http.requests_total',
-    'http.errors_total',
-];
-
 // Ініціалізація сторінки (викликається при першому відкритті)
 async function srcnnInit() {
     if (srcnnInitialized) return;
@@ -20,11 +12,18 @@ async function srcnnInit() {
 
     // Заповнити селект метрик
     const metricSel = document.getElementById('src-metric');
-    SRCNN_METRICS.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = opt.textContent = m;
-        metricSel.appendChild(opt);
-    });
+    metricSel.innerHTML = '<option value="">Оберіть метрику...</option>';
+    try {
+        const names = await apiFetch('/api/metrics/names');
+        if (Array.isArray(names)) {
+            names.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = opt.textContent = m;
+                metricSel.appendChild(opt);
+            });
+        }
+    } catch {
+    }
 
     // Завантажити сервіси
     const svcSel = document.getElementById('src-service');
@@ -39,7 +38,8 @@ async function srcnnInit() {
                 svcSel.appendChild(opt);
             });
         }
-    } catch { }
+    } catch {
+    }
 
     // Дефолтні дати: остання доба (в локальному часі ПК)
     const now = new Date();
@@ -51,14 +51,20 @@ async function srcnnInit() {
 // Запуск SrCnn аналізу
 async function srcnnRun() {
     const service = document.getElementById('src-service').value?.trim();
-    const metric  = document.getElementById('src-metric').value?.trim();
-    const from    = localToUtcIso(document.getElementById('src-from').value);
-    const to      = localToUtcIso(document.getElementById('src-to').value);
+    const metric = document.getElementById('src-metric').value?.trim();
+    const from = localToUtcIso(document.getElementById('src-from').value);
+    const to = localToUtcIso(document.getElementById('src-to').value);
     const sensitivity = parseFloat(document.getElementById('src-sensitivity').value);
     const btn = document.getElementById('src-run-btn');
 
-    if (!service) { toast('Оберіть сервіс', 'error'); return; }
-    if (!metric)  { toast('Оберіть метрику', 'error'); return; }
+    if (!service) {
+        toast('Оберіть сервіс', 'error');
+        return;
+    }
+    if (!metric) {
+        toast('Оберіть метрику', 'error');
+        return;
+    }
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Аналіз...';
@@ -109,14 +115,14 @@ function srcnnRender(data) {
     // === Статистика ===
     document.getElementById('src-stats-wrap').style.display = 'block';
     document.getElementById('src-stat-total').textContent = data.totalPoints;
-    document.getElementById('src-stat-anom').textContent  = data.anomalyCount;
+    document.getElementById('src-stat-anom').textContent = data.anomalyCount;
     const pct = data.totalPoints > 0 ? (data.anomalyCount / data.totalPoints * 100).toFixed(1) : 0;
     document.getElementById('src-stat-anom-pct').textContent = `${pct}% від ряду`;
     document.getElementById('src-stat-crit').textContent = data.criticalCount;
     document.getElementById('src-stat-warn').textContent = data.warningCount;
     document.getElementById('src-stat-info').textContent = data.infoCount;
-    document.getElementById('src-stat-max').textContent  = fmtNum(data.maxScore, 3);
-    document.getElementById('src-stat-avg').textContent  = fmtNum(data.averageScore, 3);
+    document.getElementById('src-stat-max').textContent = fmtNum(data.maxScore, 3);
+    document.getElementById('src-stat-avg').textContent = fmtNum(data.averageScore, 3);
     document.getElementById('src-stat-time').textContent = `${data.processingTimeMs} мс`;
 
     // === Графік: часовий ряд + аномалії ===
@@ -166,20 +172,20 @@ function srcnnRender(data) {
         options: {
             responsive: true,
             animation: false,
-            interaction: { mode: 'index', intersect: false },
+            interaction: {mode: 'index', intersect: false},
             plugins: {
                 legend: {
                     display: true,
                     position: 'top',
                     align: 'end',
-                    labels: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 }, boxWidth: 12 }
+                    labels: {color: '#64748b', font: {family: 'JetBrains Mono', size: 10}, boxWidth: 12}
                 },
                 tooltip: {
                     backgroundColor: '#1a2235',
                     borderColor: '#2a3f58',
                     borderWidth: 1,
-                    titleFont: { family: 'JetBrains Mono', size: 11 },
-                    bodyFont: { family: 'JetBrains Mono', size: 11 },
+                    titleFont: {family: 'JetBrains Mono', size: 11},
+                    bodyFont: {family: 'JetBrains Mono', size: 11},
                     callbacks: {
                         afterBody: (items) => {
                             const i = items[0].dataIndex;
@@ -193,8 +199,8 @@ function srcnnRender(data) {
                 }
             },
             scales: {
-                x: { ticks: { maxTicksLimit: 14, color: '#64748b', font: { size: 10 } }, grid: { color: '#1f2d40' } },
-                y: { grid: { color: '#1f2d40' }, ticks: { color: '#64748b', font: { size: 10 } } }
+                x: {ticks: {maxTicksLimit: 14, color: '#64748b', font: {size: 10}}, grid: {color: '#1f2d40'}},
+                y: {grid: {color: '#1f2d40'}, ticks: {color: '#64748b', font: {size: 10}}}
             }
         }
     });
@@ -204,8 +210,8 @@ function srcnnRender(data) {
     const scores = data.points.map(p => p.anomalyScore);
     const scoreColors = data.points.map(p =>
         p.severity === 'Critical' ? '#f87171' :
-        p.severity === 'Warning'  ? '#fbbf24' :
-        p.isAnomaly ? '#38bdf8' : 'rgba(100,116,139,.5)'
+            p.severity === 'Warning' ? '#fbbf24' :
+                p.isAnomaly ? '#38bdf8' : 'rgba(100,116,139,.5)'
     );
 
     if (srcnnScoreChart) srcnnScoreChart.destroy();
@@ -226,18 +232,18 @@ function srcnnRender(data) {
             responsive: true,
             animation: false,
             plugins: {
-                legend: { display: false },
+                legend: {display: false},
                 tooltip: {
                     backgroundColor: '#1a2235',
                     borderColor: '#2a3f58',
                     borderWidth: 1,
-                    titleFont: { family: 'JetBrains Mono', size: 11 },
-                    bodyFont: { family: 'JetBrains Mono', size: 11 },
+                    titleFont: {family: 'JetBrains Mono', size: 11},
+                    bodyFont: {family: 'JetBrains Mono', size: 11},
                 }
             },
             scales: {
-                x: { ticks: { maxTicksLimit: 14, color: '#64748b', font: { size: 10 } }, grid: { display: false } },
-                y: { min: 0, max: 1, grid: { color: '#1f2d40' }, ticks: { color: '#64748b', font: { size: 10 } } }
+                x: {ticks: {maxTicksLimit: 14, color: '#64748b', font: {size: 10}}, grid: {display: false}},
+                y: {min: 0, max: 1, grid: {color: '#1f2d40'}, ticks: {color: '#64748b', font: {size: 10}}}
             }
         }
     });
@@ -260,15 +266,15 @@ function srcnnRender(data) {
             <div style="display:flex;align-items:center;gap:8px">
               <div style="flex:0 0 60px;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
                 <div style="width:${(a.anomalyScore * 100).toFixed(0)}%;height:100%;background:${
-                    a.severity === 'Critical' ? '#f87171' :
-                    a.severity === 'Warning'  ? '#fbbf24' : '#38bdf8'}"></div>
+        a.severity === 'Critical' ? '#f87171' :
+            a.severity === 'Warning' ? '#fbbf24' : '#38bdf8'}"></div>
               </div>
               <span>${fmtNum(a.anomalyScore, 3)}</span>
             </div>
           </td>
           <td><span class="badge badge-${
-              a.severity === 'Critical' ? 'crit' :
-              a.severity === 'Warning'  ? 'warn' : 'info'}">${a.severity}</span></td>
+        a.severity === 'Critical' ? 'crit' :
+            a.severity === 'Warning' ? 'warn' : 'info'}">${a.severity}</span></td>
         </tr>`).join('');
 }
 
@@ -290,7 +296,7 @@ function srcnnExportCsv() {
         ])
     ];
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);

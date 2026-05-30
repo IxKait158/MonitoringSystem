@@ -4,5 +4,6 @@ namespace MonitoringSystem.BLL.Interfaces.Repositories;
 
 public interface IAnomalyRepository : IRepository<AnomalyEntity>
 {
-    Task<List<AnomalyEntity>> GetRecentAnomaliesAsync(IEnumerable<int> serviceIds, int count);
+    Task<List<AnomalyEntity>> GetAllRecentAnomaliesAsync(IEnumerable<int> serviceIds, int count);
+    Task<List<AnomalyEntity>> GetRecentAnomaliesByMetricAsync(List<int> serviceIds, string metricName, int count);
 }

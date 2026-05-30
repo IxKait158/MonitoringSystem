@@ -63,7 +63,10 @@ async function serviceCreate() {
     const name = document.getElementById('svc-name').value?.trim();
     const btn = document.getElementById('svc-create-btn');
 
-    if (!name) { toast('Вкажіть назву сервісу', 'error'); return; }
+    if (!name) {
+        toast('Вкажіть назву сервісу', 'error');
+        return;
+    }
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Створення...';
@@ -71,7 +74,7 @@ async function serviceCreate() {
     try {
         const s = await apiFetch('/api/services', {
             method: 'POST',
-            body: JSON.stringify({ name }),
+            body: JSON.stringify({name}),
         });
         toast(`Сервіс "${s.name}" зареєстровано`, 'success');
         document.getElementById('svc-name').value = '';
@@ -88,7 +91,7 @@ async function serviceCreate() {
 async function serviceDelete(id) {
     if (!confirm(`Видалити сервіс #${id}? Усі метрики та аномалії, повʼязані з ним, теж зникнуть.`)) return;
     try {
-        await apiFetch(`/api/services/${id}`, { method: 'DELETE' });
+        await apiFetch(`/api/services/${id}`, {method: 'DELETE'});
         toast('Сервіс видалено', 'success');
         keysLoad();
     } catch (err) {
@@ -107,7 +110,7 @@ async function keysCreate() {
     try {
         const data = await apiFetch('/api/keys', {
             method: 'POST',
-            body: JSON.stringify({ owner: owner || undefined }),
+            body: JSON.stringify({owner: owner || undefined}),
         });
 
         document.getElementById('modal-key-owner').textContent = data.owner;
@@ -129,7 +132,7 @@ async function keysCreate() {
 async function keysRevoke(id) {
     if (!confirm(`Відкликати ключ #${id}? Дашборд перестане отримувати ваші дані.`)) return;
     try {
-        const data = await apiFetch(`/api/keys/${id}`, { method: 'DELETE' });
+        const data = await apiFetch(`/api/keys/${id}`, {method: 'DELETE'});
         toast(data.message || 'Ключ відкликано', 'success');
         setApiKey('');
         location.reload();

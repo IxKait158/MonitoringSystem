@@ -1,23 +1,36 @@
 ﻿// js/page-metrics.js — сторінка "Метрики"
 
 let metricsChart = null;
+let metricsInitialized = false;
 
-const METRIC_NAMES = [
-    'http.response_time_ms',
-    'system.memory_mb',
-    'system.cpu_percent',
-    'http.requests_total',
-    'http.errors_total',
-];
+// Ініціалізація сторінки (викликається при першому відкритті)
+async function metricsInit() {
+    if (metricsInitialized) return;
+    metricsInitialized = true;
+
+    await Promise.all([metricsInitSelects(), metricsLoadServices()]);
+
+    const now = new Date();
+    const hourAgo = new Date(now - 3600_000);
+    document.getElementById('met-to').value = toLocalInputValue(now);
+    document.getElementById('met-from').value = toLocalInputValue(hourAgo);
+}
 
 // Заповнити select метрик
-function metricsInitSelects() {
+async function metricsInitSelects() {
     const sel = document.getElementById('met-metric');
-    METRIC_NAMES.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = opt.textContent = m;
-        sel.appendChild(opt);
-    });
+    sel.innerHTML = '<option value="">Оберіть метрику...</option>';
+    try {
+        const names = await apiFetch('/api/metrics/names');
+        if (Array.isArray(names)) {
+            names.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = opt.textContent = m;
+                sel.appendChild(opt);
+            });
+        }
+    } catch {
+    }
 }
 
 // Завантажити сервіси
@@ -34,21 +47,28 @@ async function metricsLoadServices() {
                 sel.appendChild(opt);
             });
         }
-    } catch { }
+    } catch {
+    }
 }
 
 // Завантажити метрики і відобразити
 async function metricsLoad() {
     const service = document.getElementById('met-service').value?.trim();
-    const metric  = document.getElementById('met-metric').value?.trim();
-    const from    = localToUtcIso(document.getElementById('met-from').value);
-    const to      = localToUtcIso(document.getElementById('met-to').value);
-    const btn     = document.getElementById('met-load-btn');
-    const tbody   = document.getElementById('met-tbody');
+    const metric = document.getElementById('met-metric').value?.trim();
+    const from = localToUtcIso(document.getElementById('met-from').value);
+    const to = localToUtcIso(document.getElementById('met-to').value);
+    const btn = document.getElementById('met-load-btn');
+    const tbody = document.getElementById('met-tbody');
     const chartWrap = document.getElementById('met-chart-wrap');
 
-    if (!service) { toast('Оберіть сервіс', 'error'); return; }
-    if (!metric)  { toast('Оберіть метрику', 'error'); return; }
+    if (!service) {
+        toast('Оберіть сервіс', 'error');
+        return;
+    }
+    if (!metric) {
+        toast('Оберіть метрику', 'error');
+        return;
+    }
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>';
@@ -56,9 +76,9 @@ async function metricsLoad() {
     chartWrap.style.display = 'none';
 
     try {
-        const params = new URLSearchParams({ service, metric });
+        const params = new URLSearchParams({service, metric});
         if (from) params.set('from', from);
-        if (to)   params.set('to', to);
+        if (to) params.set('to', to);
 
         const data = await apiFetch(`/api/metrics?${params}`);
 
@@ -100,10 +120,10 @@ async function metricsLoad() {
             options: {
                 responsive: true,
                 animation: false,
-                plugins: { legend: { display: false } },
+                plugins: {legend: {display: false}},
                 scales: {
-                    x: { ticks: { maxTicksLimit: 12, color: '#64748b', font: { size: 10 } }, grid: { color: '#1f2d40' } },
-                    y: { grid: { color: '#1f2d40' }, ticks: { color: '#64748b', font: { size: 10 } } }
+                    x: {ticks: {maxTicksLimit: 12, color: '#64748b', font: {size: 10}}, grid: {color: '#1f2d40'}},
+                    y: {grid: {color: '#1f2d40'}, ticks: {color: '#64748b', font: {size: 10}}}
                 }
             }
         });
@@ -130,7 +150,7 @@ async function servicesStatusLoad() {
             return;
         }
         tbody.innerHTML = statuses.map(s => {
-            const rt  = s.latestMetrics?.['http.response_time_ms'];
+            const rt = s.latestMetrics?.['http.response_time_ms'];
             const mem = s.latestMetrics?.['system.memory_mb'];
             const rtCls = rt != null ? metricClass('http.response_time_ms', rt) : 'ok';
             return `
@@ -147,13 +167,3 @@ async function servicesStatusLoad() {
     }
 }
 
-// Init
-document.addEventListener('DOMContentLoaded', () => {
-    metricsInitSelects();
-    metricsLoadServices();
-
-    const now = new Date();
-    const hourAgo = new Date(now - 3600_000);
-    document.getElementById('met-to').value   = toLocalInputValue(now);
-    document.getElementById('met-from').value = toLocalInputValue(hourAgo);
-});

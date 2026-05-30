@@ -21,8 +21,8 @@ const chartConfig = (label, color) => ({
     options: {
         responsive: true,
         animation: false,
-        scales: { x: { display: false }, y: { grid: { color: '#1f2d40' } } },
-        plugins: { legend: { display: false } }
+        scales: {x: {display: false}, y: {grid: {color: '#1f2d40'}}},
+        plugins: {legend: {display: false}}
     }
 });
 
@@ -30,7 +30,7 @@ const rtChart = new Chart(document.getElementById('responseTimeChart'), chartCon
 const memChart = new Chart(document.getElementById('memoryChart'), chartConfig('Memory MB', '#34d399'));
 
 function addChartPoint(chart, value) {
-    const time = new Date().toLocaleTimeString('uk', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const time = new Date().toLocaleTimeString('uk', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
     chart.data.labels.push(time);
     chart.data.datasets[0].data.push(value);
     if (chart.data.labels.length > MAX_POINTS) {
@@ -149,14 +149,16 @@ async function dashboardInitialLoad() {
     try {
         const statuses = await apiFetch('/api/metrics/services');
         renderServices(statuses);
-    } catch { /* мовчки */ }
+    } catch { /* мовчки */
+    }
 
     try {
         const anomalies = await apiFetch('/api/anomalies?count=20');
         if (Array.isArray(anomalies) && anomalies.length) {
             [...anomalies].reverse().forEach(prependAnomaly);
         }
-    } catch { /* мовчки */ }
+    } catch { /* мовчки */
+    }
 }
 
 dashboardInitialLoad();

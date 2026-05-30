@@ -18,15 +18,18 @@ async function apiFetch(path, options = {}) {
     const res = await fetch(`${API_URL}${path}`, {
         headers: {
             'Content-Type': 'application/json',
-            ...(apiKey ? { 'X-API-KEY': apiKey } : {}),
+            ...(apiKey ? {'X-API-KEY': apiKey} : {}),
         },
         ...options,
     });
 
     const text = await res.text();
     let data;
-    try { data = text ? JSON.parse(text) : null; }
-    catch { data = { message: text }; }
+    try {
+        data = text ? JSON.parse(text) : null;
+    } catch {
+        data = {message: text};
+    }
 
     // Невалідний/відсутній ключ — викидаємо у "вихідний" стан.
     if (res.status === 401 || res.status === 403) {
@@ -40,6 +43,7 @@ async function apiFetch(path, options = {}) {
 
 // Реакція на 401/403 — очищаємо ключ, блокуємо навігацію, кидаємо на дашборд
 let _unauthorizedHandled = false;
+
 function handleUnauthorized(message) {
     if (_unauthorizedHandled) return;
     _unauthorizedHandled = true;
@@ -60,7 +64,9 @@ function handleUnauthorized(message) {
     }
 
     // Дозволимо нові спроби після короткої паузи
-    setTimeout(() => { _unauthorizedHandled = false; }, 2000);
+    setTimeout(() => {
+        _unauthorizedHandled = false;
+    }, 2000);
 }
 
 // Спливаючі сповіщення
@@ -76,7 +82,7 @@ function toast(msg, type = 'info') {
 // Помічники форматування
 function fmtTime(iso) {
     if (!iso) return '—';
-    return new Date(iso).toLocaleTimeString('uk', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return new Date(iso).toLocaleTimeString('uk', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
 }
 
 function fmtDate(iso) {

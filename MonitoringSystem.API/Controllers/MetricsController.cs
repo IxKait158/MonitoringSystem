@@ -73,4 +73,22 @@ public class MetricsController(IMetricsService metricsService) : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Отримати всі назви метрик поточного користувача
+    /// GET /api/metrics/names
+    /// </summary>
+    [HttpGet("names")]
+    public async Task<IActionResult> GetMetricsNames()
+    {
+        try
+        {
+            var names = await metricsService.GetMetricsNamesAsync(CurrentApiKey);
+            return Ok(names);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

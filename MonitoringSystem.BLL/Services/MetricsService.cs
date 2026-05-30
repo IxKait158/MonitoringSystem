@@ -19,7 +19,7 @@ public class MetricsService(
 {
     // Ключ: serviceId. Статус живе у пам'яті, відновлюється з потоку метрик.
     private static readonly ConcurrentDictionary<int, ServiceStatus> ServiceStatuses = new();
-    private static readonly object ServiceStatusLock = new();
+    private static readonly Lock ServiceStatusLock = new();
 
     public async Task IngestAsync(ApiKeyEntity apiKey, MetricIngestionRequest request)
     {
@@ -87,7 +87,7 @@ public class MetricsService(
     {
         var service = await servicesRepository.FindByApiKeyAndNameAsync(apiKey.Id, serviceName);
         if (service == null)
-            return new List<MetricPointDTO>();
+            return [];
 
         var query = metricPointRepository.GetAll(m =>
             m.ServiceId == service.Id &&
@@ -109,14 +109,16 @@ public class MetricsService(
             .ToList();
     }
 
-    public async Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, int count)
+    public async Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, string metricName, int count)
     {
         var services = await servicesRepository.GetByApiKeyAsync(apiKey.Id);
         if (services.Count == 0)
-            return new List<AnomalyResult>();
+            return [];
 
         var serviceIds = services.Select(s => s.Id).ToList();
-        var entities = await anomalyRepository.GetRecentAnomaliesAsync(serviceIds, count);
+        var entities = string.IsNullOrEmpty(metricName) 
+            ? await anomalyRepository.GetAllRecentAnomaliesAsync(serviceIds, count) 
+            : await anomalyRepository.GetRecentAnomaliesByMetricAsync(serviceIds, metricName, count);
 
         return entities.Select(e => new AnomalyResult
         {
@@ -267,6 +269,18 @@ public class MetricsService(
                 .Group(GroupName(apiKeyId))
                 .SendAsync("ServiceStatusUpdated", snapshot);
         }
+    }
+
+    public async Task<List<string>> GetMetricsNamesAsync(ApiKeyEntity apiKey)
+    {
+        var services = await servicesRepository.GetByApiKeyAsync(apiKey.Id);
+        if (services.Count == 0)
+            return [];
+
+        var serviceIds = services.Select(s => s.Id);
+        var entities = metricPointRepository.GetAllNoTracking(x => serviceIds.Contains(x.ServiceId));
+        
+        return entities.Select(x => x.MetricName).Distinct().ToList();
     }
 
     private static void UpdateServiceStatus(int serviceId, string serviceName, MetricPointDTO metric, bool hasAnomaly)

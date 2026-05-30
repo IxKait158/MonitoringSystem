@@ -16,7 +16,7 @@ public interface IMetricsService
         DateTime from,
         DateTime to);
 
-    Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, int count);
+    Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, string metricName, int count);
 
     Task<SrCnnBatchAnalysisResponse> AnalyzeSrCnnBatchAsync(
         ApiKeyEntity apiKey,
@@ -25,4 +25,6 @@ public interface IMetricsService
     Task<List<ServiceStatus>> GetServiceStatusesAsync(ApiKeyEntity apiKey);
 
     Task RefreshServiceHealthAsync(TimeSpan timeout);
+
+    Task<List<string>> GetMetricsNamesAsync(ApiKeyEntity apiKey);
 }

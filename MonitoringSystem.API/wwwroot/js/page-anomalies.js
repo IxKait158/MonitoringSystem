@@ -1,12 +1,24 @@
 ﻿// js/page-anomalies.js — сторінка "Аномалії"
 
-const ANOMALY_METRICS = [
-    'http.response_time_ms',
-    'system.memory_mb',
-    'system.cpu_percent',
-    'http.requests_total',
-    'http.errors_total',
-];
+let anomaliesInitialized = false;
+
+// Ініціалізація сторінки (викликається при першому відкритті)
+async function anomaliesInit() {
+    if (anomaliesInitialized) return;
+    anomaliesInitialized = true;
+
+    await Promise.all([anomaliesLoadServices(), anomaliesLoadMetrics()]);
+
+    const now = new Date();
+    const hourAgo = new Date(now - 3600_000);
+    document.getElementById('an-to').value = toLocalInputValue(now);
+    document.getElementById('an-from').value = toLocalInputValue(hourAgo);
+
+    const cmpTo = document.getElementById('cmp-to');
+    const cmpFrom = document.getElementById('cmp-from');
+    if (cmpTo) cmpTo.value = toLocalInputValue(now);
+    if (cmpFrom) cmpFrom.value = toLocalInputValue(new Date(now - 86400_000));
+}
 
 // Завантажити список сервісів у select
 async function anomaliesLoadServices() {
@@ -22,33 +34,43 @@ async function anomaliesLoadServices() {
                 sel.appendChild(opt);
             });
         }
-    } catch { }
+    } catch {
+    }
 }
 
 // Заповнити селект метрик (з опцією "Всі метрики")
-function anomaliesLoadMetrics() {
+async function anomaliesLoadMetrics() {
     const sel = document.getElementById('an-metric');
     if (!sel) return;
     sel.innerHTML = '<option value="">Всі метрики</option>';
-    ANOMALY_METRICS.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = opt.textContent = m;
-        sel.appendChild(opt);
-    });
+    try {
+        const names = await apiFetch('/api/metrics/names');
+        if (Array.isArray(names)) {
+            names.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = opt.textContent = m;
+                sel.appendChild(opt);
+            });
+        }
+    } catch {
+    }
 }
 
 // Завантажити та відрендерити аномалії
 async function anomaliesLoad() {
-    const btn    = document.getElementById('an-load-btn');
-    const tbody  = document.getElementById('an-tbody');
-    const count  = parseInt(document.getElementById('an-count').value) || 50;
+    const btn = document.getElementById('an-load-btn');
+    const tbody = document.getElementById('an-tbody');
+    const count = parseInt(document.getElementById('an-count').value) || 50;
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Завантаження...';
     tbody.innerHTML = `<tr><td colspan="6" class="empty loading">Завантаження...</td></tr>`;
 
     try {
-        const params = new URLSearchParams({ count });
+        const metricName = document.getElementById('an-metric')?.value?.trim() || '';
+
+        const params = new URLSearchParams({count});
+        if (metricName) params.set('metricName', metricName);
         const anomalies = await apiFetch(`/api/anomalies?${params}`);
 
         if (!anomalies || !anomalies.length) {
@@ -56,17 +78,15 @@ async function anomaliesLoad() {
             return;
         }
 
-        // Клієнтська фільтрація по сервісу, метриці і часу
-        const svcFilter    = document.getElementById('an-service').value;
-        const metricFilter = document.getElementById('an-metric')?.value || '';
-        const fromFilter   = document.getElementById('an-from').value ? new Date(document.getElementById('an-from').value) : null;
-        const toFilter     = document.getElementById('an-to').value   ? new Date(document.getElementById('an-to').value)   : null;
+        // Клієнтська фільтрація по сервісу і часу (метрика — на сервері)
+        const svcFilter = document.getElementById('an-service').value;
+        const fromFilter = document.getElementById('an-from').value ? new Date(document.getElementById('an-from').value) : null;
+        const toFilter = document.getElementById('an-to').value ? new Date(document.getElementById('an-to').value) : null;
 
         let filtered = anomalies;
-        if (svcFilter)    filtered = filtered.filter(a => a.serviceName === svcFilter);
-        if (metricFilter) filtered = filtered.filter(a => a.metricName === metricFilter);
-        if (fromFilter)   filtered = filtered.filter(a => new Date(a.detectedAt) >= fromFilter);
-        if (toFilter)     filtered = filtered.filter(a => new Date(a.detectedAt) <= toFilter);
+        if (svcFilter) filtered = filtered.filter(a => a.serviceName === svcFilter);
+        if (fromFilter) filtered = filtered.filter(a => new Date(a.detectedAt) >= fromFilter);
+        if (toFilter) filtered = filtered.filter(a => new Date(a.detectedAt) <= toFilter);
 
         if (!filtered.length) {
             tbody.innerHTML = `<tr><td colspan="6" class="empty">За вказаними фільтрами нічого не знайдено</td></tr>`;
@@ -92,16 +112,3 @@ async function anomaliesLoad() {
     }
 }
 
-// Init
-document.addEventListener('DOMContentLoaded', () => {
-    anomaliesLoadServices();
-    anomaliesLoadMetrics();
-
-    // Дефолт: остання година
-    const now = new Date();
-    const hourAgo = new Date(now - 3600_000);
-    document.getElementById('an-to').value   = toLocalInputValue(now);
-    document.getElementById('an-from').value = toLocalInputValue(hourAgo);
-    document.getElementById('cmp-to').value   = toLocalInputValue(now);
-    document.getElementById('cmp-from').value = toLocalInputValue(new Date(now - 86400_000));
-});

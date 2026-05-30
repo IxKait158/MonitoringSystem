@@ -17,11 +17,11 @@ public class AnomaliesController(IMetricsService metricsService) : ControllerBas
     /// GET /api/anomalies?count=20
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetAnomalies([FromQuery] int count = 20)
+    public async Task<IActionResult> GetAnomalies([FromQuery] string? metricName = null, [FromQuery] int count = 20)
     {
         try
         {
-            var anomalies = await metricsService.GetRecentAnomaliesAsync(CurrentApiKey, count);
+            var anomalies = await metricsService.GetRecentAnomaliesAsync(CurrentApiKey, metricName, count);
             return Ok(anomalies);
         }
         catch (Exception ex)
