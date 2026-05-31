@@ -71,7 +71,11 @@ function prependAnomaly(a) {
     const stub = list.querySelector('[data-stub]');
     if (stub) stub.remove();
 
-    const time = a.detectedAt ? new Date(a.detectedAt).toLocaleTimeString('uk') : new Date().toLocaleTimeString('uk');
+    const when = a.detectedAt ? new Date(a.detectedAt) : new Date();
+    const time = when.toLocaleString('uk', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
     const item = document.createElement('div');
     item.className = 'anomaly-item';
     item.innerHTML = `

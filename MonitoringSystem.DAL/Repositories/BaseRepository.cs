@@ -23,6 +23,11 @@ public class BaseRepository<T>(MonitoringDbContext context) : IRepository<T>
         return await Context.SaveChangesAsync();
     }
 
+    public async Task AddRangeAsync(IEnumerable<T> entities)
+    {
+        await Set.AddRangeAsync(entities);
+    }
+
     public async Task<int> UpdateAsync(T t)
     {
         Set.Update(t);
@@ -35,22 +40,22 @@ public class BaseRepository<T>(MonitoringDbContext context) : IRepository<T>
         return await Context.SaveChangesAsync();
     }
 
-    public IEnumerable<T> GetAll(Expression<Func<T, bool>>? predicate = null)
+    public IQueryable<T> GetAll(Expression<Func<T, bool>>? predicate = null)
     {
         IQueryable<T> query = Set;
         if (predicate != null)
             query = query.Where(predicate);
         
-        return query.AsEnumerable();
+        return query;
     }
 
-    public IEnumerable<T> GetAllNoTracking(Expression<Func<T, bool>>? predicate = null)
+    public IQueryable<T> GetAllNoTracking(Expression<Func<T, bool>>? predicate = null)
     {
         IQueryable<T> query = Set.AsNoTracking();
         if (predicate != null)
             query = query.Where(predicate);
         
-        return query.AsEnumerable();
+        return query;
     }
 
     public async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate)

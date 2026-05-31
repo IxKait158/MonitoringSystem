@@ -14,7 +14,6 @@ public class MetricsController(IMetricsService metricsService) : ControllerBase
 
     /// <summary>
     /// Прийом метрик від користувацького сервісу за X-API-KEY.
-    /// Сервіс створюється автоматично, якщо ще не зареєстрований під цим ключем.
     /// POST /api/metrics/ingest
     /// </summary>
     [HttpPost("ingest")]

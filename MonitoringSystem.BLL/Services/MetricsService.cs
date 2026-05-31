@@ -33,13 +33,15 @@ public class MetricsService(
                 $"Сервіс '{serviceName}' не зареєстровано під цим API ключем. " +
                 "Спочатку зареєструйте сервіс з таким ім'ям.");
 
+        var metricEntities = new List<MetricPointEntity>(request.Metrics.Count);
+        var anomalyEntities = new List<AnomalyEntity>();
         var anomalies = new List<AnomalyResult>();
 
         foreach (var metric in request.Metrics)
         {
             metric.ServiceName = serviceName;
 
-            await metricPointsRepository.AddAsync(new MetricPointEntity
+            metricEntities.Add(new MetricPointEntity
             {
                 ServiceId = service.Id,
                 MetricName = metric.MetricName,
@@ -53,7 +55,7 @@ public class MetricsService(
             {
                 anomalies.Add(anomaly);
 
-                await anomaliesRepository.AddAsync(new AnomalyEntity
+                anomalyEntities.Add(new AnomalyEntity
                 {
                     ServiceId = service.Id,
                     MetricName = anomaly.MetricName,
@@ -67,6 +69,11 @@ public class MetricsService(
 
             UpdateServiceStatus(service.Id, serviceName, metric, anomaly.IsAnomaly);
         }
+
+        await metricPointsRepository.AddRangeAsync(metricEntities);
+        if (anomalyEntities.Count > 0)
+            await anomaliesRepository.AddRangeAsync(anomalyEntities);
+        await metricPointsRepository.SaveChangesAsync();
 
         var group = GroupName(apiKey.Id);
         await hubContext.Clients.Group(group).SendAsync("MetricsUpdated", request.Metrics);
@@ -109,7 +116,7 @@ public class MetricsService(
             .ToList();
     }
 
-    public async Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, string metricName, int count)
+    public async Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, string? metricName, int count)
     {
         var services = await servicesRepository.GetByApiKeyAsync(apiKey.Id);
         if (services.Count == 0)
@@ -277,10 +284,8 @@ public class MetricsService(
         if (services.Count == 0)
             return [];
 
-        var serviceIds = services.Select(s => s.Id);
-        var entities = metricPointsRepository.GetAllNoTracking(x => serviceIds.Contains(x.ServiceId));
-        
-        return entities.Select(x => x.MetricName).Distinct().ToList();
+        var serviceIds = services.Select(s => s.Id).ToList();
+        return await metricPointsRepository.GetMetricsNames(serviceIds);
     }
 
     private static void UpdateServiceStatus(int serviceId, string serviceName, MetricPointDTO metric, bool hasAnomaly)

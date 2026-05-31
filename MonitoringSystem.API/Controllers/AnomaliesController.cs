@@ -14,7 +14,7 @@ public class AnomaliesController(IMetricsService metricsService) : ControllerBas
 
     /// <summary>
     /// Останні аномалії по сервісах поточного API ключа.
-    /// GET /api/anomalies?count=20
+    /// GET /api/anomalies?metricName=test&count=20
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAnomalies([FromQuery] string? metricName = null, [FromQuery] int count = 20)

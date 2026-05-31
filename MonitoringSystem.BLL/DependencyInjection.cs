@@ -13,13 +13,11 @@ public static class DependencyInjection
         services.Configure<ServiceHealthOptions>(configuration.GetSection("ServiceHealth"));
 
         services.AddSingleton<IAnomalyDetectionService, AnomalyDetectionService>();
-        services.AddSingleton<IMetricIngestionQueue, MetricIngestionQueue>();
 
         services.AddScoped<IMetricsService, MetricsService>();
         services.AddScoped<IApiKeysService, ApiKeysService>();
         services.AddScoped<IServicesService, ServicesService>();
 
-        services.AddHostedService<MetricIngestionBackgroundService>();
         services.AddHostedService<ServiceHealthBackgroundService>();
 
         return services;

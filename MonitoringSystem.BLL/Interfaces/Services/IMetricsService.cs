@@ -16,7 +16,7 @@ public interface IMetricsService
         DateTime from,
         DateTime to);
 
-    Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, string metricName, int count);
+    Task<List<AnomalyResult>> GetRecentAnomaliesAsync(ApiKeyEntity apiKey, string? metricName, int count);
 
     Task<SrCnnBatchAnalysisResponse> AnalyzeSrCnnBatchAsync(
         ApiKeyEntity apiKey,
