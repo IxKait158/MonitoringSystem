@@ -4,7 +4,7 @@ using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.DAL.Repositories;
 
-public class ApiKeysesRepository(MonitoringDbContext context) : BaseRepository<ApiKeyEntity>(context), IApiKeysRepository
+public class ApiKeysRepository(MonitoringDbContext context) : BaseRepository<ApiKeyEntity>(context), IApiKeysRepository
 {
     
 }

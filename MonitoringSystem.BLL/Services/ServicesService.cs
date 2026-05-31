@@ -44,21 +44,4 @@ public class ServicesService(IServicesRepository servicesRepository) : IServices
 
         await servicesRepository.DeleteAsync(entity);
     }
-
-    public async Task<ServiceEntity> GetOrCreateAsync(ApiKeyEntity apiKey, string name)
-    {
-        var trimmedName = name.Trim();
-        var existing = await servicesRepository.FindByApiKeyAndNameAsync(apiKey.Id, trimmedName);
-        if (existing != null)
-            return existing;
-
-        var entity = new ServiceEntity
-        {
-            Name = trimmedName,
-            ApiKeyId = apiKey.Id
-        };
-        await servicesRepository.AddAsync(entity);
-        
-        return entity;
-    }
 }

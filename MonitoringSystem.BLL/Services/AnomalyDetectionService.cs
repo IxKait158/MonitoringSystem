@@ -73,66 +73,6 @@ public class AnomalyDetectionService(
             return result;
         }
     }
-
-    public List<AnomalyAlgorithmComparisonResult> CompareAlgorithms(
-        string serviceName, string metricName,
-        List<(DateTime Timestamp, double Value)> timeSeries)
-    {
-        var orderedSeries = timeSeries
-            .OrderBy(x => x.Timestamp)
-            .ToList();
-
-        var results = new List<AnomalyAlgorithmComparisonResult>
-        {
-            BuildComparisonResult(
-                "Z-score",
-                AnalyzeBatchWithZScore(serviceName, metricName, orderedSeries))
-        };
-
-        var srCnnResults = AnalyzeBatchWithMlNet(serviceName, metricName, orderedSeries);
-        if (srCnnResults.Count != 0)
-            results.Add(BuildComparisonResult("ML.NET SrCnn", srCnnResults));
-
-        return results;
-    }
-
-    private List<AnomalyResult> AnalyzeBatchWithZScore(
-        string serviceName, string metricName,
-        List<(DateTime Timestamp, double Value)> timeSeries)
-    {
-        var results = new List<AnomalyResult>();
-
-        for (var i = 0; i < timeSeries.Count; i++)
-        {
-            var point = timeSeries[i];
-            var history = timeSeries
-                .Skip(Math.Max(0, i - WindowSize))
-                .Take(Math.Min(WindowSize, i))
-                .Select(x => x.Value)
-                .ToArray();
-
-            if (history.Length < MinHistorySize)
-                continue;
-
-            var mean = history.Average();
-            var std = StandardDeviation(history);
-            if (std <= 0)
-                continue;
-
-            var zScore = Math.Abs((point.Value - mean) / std);
-            var anomalyScore = Math.Min(zScore / ZScoreThreshold, 1.0);
-
-            results.Add(CreateBatchResult(
-                serviceName,
-                metricName,
-                point,
-                mean,
-                anomalyScore,
-                zScore > ZScoreThreshold));
-        }
-
-        return results;
-    }
     
     /// <summary>
     /// ML.NET підхід — SrCnn алгоритм для часових рядів.
@@ -181,42 +121,6 @@ public class AnomalyDetectionService(
             DetectedAt = point.Timestamp
         }).ToList();
     }
-
-    private static AnomalyAlgorithmComparisonResult BuildComparisonResult(
-        string algorithm,
-        List<AnomalyResult> results)
-    {
-        var anomalies = results
-            .Where(x => x.IsAnomaly)
-            .OrderByDescending(x => x.AnomalyScore)
-            .ToList();
-
-        return new AnomalyAlgorithmComparisonResult
-        {
-            Algorithm = algorithm,
-            TotalAnomalies = anomalies.Count,
-            AverageScore = results.Count == 0 ? 0 : results.Average(x => x.AnomalyScore),
-            MaxScore = results.Count == 0 ? 0 : results.Max(x => x.AnomalyScore),
-            Anomalies = anomalies
-        };
-    }
-
-    private static AnomalyResult CreateBatchResult(
-        string serviceName, string metricName,
-        (DateTime Timestamp, double Value) point,
-        double expectedValue,
-        double anomalyScore,
-        bool isAnomaly) =>
-        new()
-        {
-            ServiceName = serviceName,
-            MetricName = metricName,
-            Value = point.Value,
-            ExpectedValue = expectedValue,
-            AnomalyScore = anomalyScore,
-            IsAnomaly = isAnomaly,
-            DetectedAt = point.Timestamp
-        };
 
     private static double StandardDeviation(double[] values)
     {

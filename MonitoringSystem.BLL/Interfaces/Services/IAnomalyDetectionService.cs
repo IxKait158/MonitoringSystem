@@ -7,11 +7,6 @@ public interface IAnomalyDetectionService
 {
     AnomalyResult Analyze(int serviceId, string serviceName, MetricPointDTO pointDto);
 
-    List<AnomalyAlgorithmComparisonResult> CompareAlgorithms(
-        string serviceName,
-        string metricName,
-        List<(DateTime Timestamp, double Value)> timeSeries);
-
     List<AnomalyResult> AnalyzeBatchWithMlNet(
         string serviceName,
         string metricName,

@@ -17,9 +17,9 @@ public static class DependencyInjection
         services.AddDbContext<MonitoringDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
-        services.AddScoped<IMetricPointRepository, MetricPointRepository>();
-        services.AddScoped<IAnomalyRepository, AnomalyRepository>();
-        services.AddScoped<IApiKeysRepository, ApiKeysesRepository>();
+        services.AddScoped<IMetricPointsRepository, MetricPointsRepository>();
+        services.AddScoped<IAnomaliesRepository, AnomaliesRepository>();
+        services.AddScoped<IApiKeysRepository, ApiKeysRepository>();
         services.AddScoped<IServicesRepository, ServicesRepository>();
 
         return services;

@@ -5,8 +5,8 @@ using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.DAL.Repositories;
 
-public class AnomalyRepository(MonitoringDbContext context)
-    : BaseRepository<AnomalyEntity>(context), IAnomalyRepository
+public class AnomaliesRepository(MonitoringDbContext context)
+    : BaseRepository<AnomalyEntity>(context), IAnomaliesRepository
 {
     public async Task<List<AnomalyEntity>> GetAllRecentAnomaliesAsync(IEnumerable<int> serviceIds, int count)
     {

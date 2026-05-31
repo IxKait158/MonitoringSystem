@@ -4,6 +4,6 @@ using MonitoringSystem.Domain.Entities;
 
 namespace MonitoringSystem.DAL.Repositories;
 
-public class MetricPointRepository(MonitoringDbContext context) : BaseRepository<MetricPointEntity>(context), IMetricPointRepository
+public class MetricPointsRepository(MonitoringDbContext context) : BaseRepository<MetricPointEntity>(context), IMetricPointsRepository
 {
 }

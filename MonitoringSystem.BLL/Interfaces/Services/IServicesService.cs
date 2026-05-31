@@ -10,6 +10,4 @@ public interface IServicesService
     Task<List<ServiceDTO>> GetAllAsync(ApiKeyEntity apiKey);
 
     Task DeleteAsync(ApiKeyEntity apiKey, int id);
-
-    Task<ServiceEntity> GetOrCreateAsync(ApiKeyEntity apiKey, string name);
 }

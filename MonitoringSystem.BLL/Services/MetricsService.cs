@@ -11,8 +11,8 @@ using MonitoringSystem.Domain.Entities;
 namespace MonitoringSystem.BLL.Services;
 
 public class MetricsService(
-    IMetricPointRepository metricPointRepository,
-    IAnomalyRepository anomalyRepository,
+    IMetricPointsRepository metricPointsRepository,
+    IAnomaliesRepository anomaliesRepository,
     IAnomalyDetectionService anomalyDetectionService,
     IServicesRepository servicesRepository,
     IHubContext<MetricsHub> hubContext) : IMetricsService
@@ -39,7 +39,7 @@ public class MetricsService(
         {
             metric.ServiceName = serviceName;
 
-            await metricPointRepository.AddAsync(new MetricPointEntity
+            await metricPointsRepository.AddAsync(new MetricPointEntity
             {
                 ServiceId = service.Id,
                 MetricName = metric.MetricName,
@@ -53,7 +53,7 @@ public class MetricsService(
             {
                 anomalies.Add(anomaly);
 
-                await anomalyRepository.AddAsync(new AnomalyEntity
+                await anomaliesRepository.AddAsync(new AnomalyEntity
                 {
                     ServiceId = service.Id,
                     MetricName = anomaly.MetricName,
@@ -89,7 +89,7 @@ public class MetricsService(
         if (service == null)
             return [];
 
-        var query = metricPointRepository.GetAll(m =>
+        var query = metricPointsRepository.GetAll(m =>
             m.ServiceId == service.Id &&
             m.MetricName == metricName &&
             m.Timestamp >= from &&
@@ -117,8 +117,8 @@ public class MetricsService(
 
         var serviceIds = services.Select(s => s.Id).ToList();
         var entities = string.IsNullOrEmpty(metricName) 
-            ? await anomalyRepository.GetAllRecentAnomaliesAsync(serviceIds, count) 
-            : await anomalyRepository.GetRecentAnomaliesByMetricAsync(serviceIds, metricName, count);
+            ? await anomaliesRepository.GetAllRecentAnomaliesAsync(serviceIds, count) 
+            : await anomaliesRepository.GetRecentAnomaliesByMetricAsync(serviceIds, metricName, count);
 
         return entities.Select(e => new AnomalyResult
         {
@@ -278,7 +278,7 @@ public class MetricsService(
             return [];
 
         var serviceIds = services.Select(s => s.Id);
-        var entities = metricPointRepository.GetAllNoTracking(x => serviceIds.Contains(x.ServiceId));
+        var entities = metricPointsRepository.GetAllNoTracking(x => serviceIds.Contains(x.ServiceId));
         
         return entities.Select(x => x.MetricName).Distinct().ToList();
     }
